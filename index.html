@@ -1,0 +1,3272 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>格局清圖工坊｜房地產平面圖一鍵清圖與空間標註工具</title>
+  <meta name="description" content="免費開放的純前端房地產平面圖清圖與標註網頁工具：自動轉純白底、隔間牆純黑線條、保留衛浴空間與設備、手動精修與可拖曳縮放空間文字標籤。" />
+  <style>
+    :root {
+      --bg-canvas: #e9e7e1;
+      --bg-panel: #faf9f6;
+      --bg-surface: #ffffff;
+      --bg-hover: #f0eee9;
+      --bg-active: #18181b;
+      --text-primary: #18181b;
+      --text-secondary: #52525b;
+      --text-muted: #71717a;
+      --border: #dcdad3;
+      --border-strong: #c5c2b8;
+      --accent: #2563eb;
+      --accent-soft: #eff6ff;
+      --danger: #dc2626;
+      --danger-soft: #fef2f2;
+      --success: #15803d;
+      --shadow-sm: 0 1px 2px rgba(24, 24, 27, 0.06);
+      --shadow-sheet: 0 10px 32px rgba(24, 24, 27, 0.14), 0 2px 8px rgba(24, 24, 27, 0.06);
+      --radius-sm: 6px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      --font-sans: "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: var(--font-sans);
+      font-size: 13px;
+      color: var(--text-primary);
+      background: var(--bg-canvas);
+      -webkit-font-smoothing: antialiased;
+      user-select: none;
+    }
+
+    .app-shell {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      height: 100vh;
+      height: 100dvh;
+    }
+
+    .topbar {
+      height: 52px;
+      flex-shrink: 0;
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 14px;
+      gap: 10px;
+      z-index: 30;
+    }
+
+    .topbar-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-right: 10px;
+      border-right: 1px solid var(--border);
+      margin-right: 2px;
+    }
+
+    .brand-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 7px;
+      background: var(--text-primary);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .brand-title {
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+      margin: 0;
+    }
+
+    .brand-sub {
+      font-size: 11px;
+      color: var(--text-muted);
+      display: none;
+    }
+
+    @media (min-width: 1280px) {
+      .brand-sub {
+        display: inline;
+        margin-left: 2px;
+        font-weight: 400;
+      }
+    }
+
+    .divider-v {
+      width: 1px;
+      height: 22px;
+      background: var(--border);
+      margin: 0 3px;
+      flex-shrink: 0;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      height: 32px;
+      padding: 0 11px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--bg-surface);
+      color: var(--text-primary);
+      font-family: inherit;
+      font-size: 12.5px;
+      font-weight: 500;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease, transform 0.08s ease;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .btn:hover:not(:disabled) {
+      background: var(--bg-hover);
+      border-color: var(--border-strong);
+    }
+
+    .btn:active:not(:disabled) { transform: translateY(0.5px); }
+    .btn:disabled { opacity: 0.42; cursor: not-allowed; box-shadow: none; }
+    .btn-icon { width: 32px; padding: 0; }
+    .btn-primary { background: var(--text-primary); border-color: var(--text-primary); color: #ffffff; }
+    .btn-primary:hover:not(:disabled) { background: #2e2e33; border-color: #2e2e33; }
+    .btn-accent { background: var(--accent); border-color: var(--accent); color: #ffffff; }
+    .btn-accent:hover:not(:disabled) { background: #1d4ed8; border-color: #1d4ed8; }
+    .btn-toggle.active { background: var(--accent-soft); border-color: #93c5fd; color: var(--accent); }
+    .btn-danger-ghost { color: var(--danger); border-color: #fecaca; background: #fff; }
+    .btn-danger-ghost:hover:not(:disabled) { background: var(--danger-soft); border-color: #fca5a5; }
+
+    .zoom-readout {
+      min-width: 48px;
+      text-align: center;
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+      color: var(--text-secondary);
+      cursor: pointer;
+      padding: 4px 6px;
+      border-radius: 4px;
+    }
+    .zoom-readout:hover { background: var(--bg-hover); }
+
+    .workspace {
+      flex: 1;
+      display: flex;
+      min-height: 0;
+      position: relative;
+    }
+
+    .panel {
+      background: var(--bg-panel);
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow-y: auto;
+      z-index: 20;
+    }
+    .panel::-webkit-scrollbar { width: 6px; }
+    .panel::-webkit-scrollbar-thumb { background: #d4d1c7; border-radius: 3px; }
+    .panel-left { width: 248px; flex-shrink: 0; border-right: 1px solid var(--border); }
+    .panel-right { width: 264px; flex-shrink: 0; border-left: 1px solid var(--border); }
+    .panel-section { padding: 13px 14px; border-bottom: 1px solid var(--border); }
+    .panel-section:last-child { border-bottom: none; }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .section-title {
+      font-size: 11.5px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      margin: 0;
+    }
+
+    .section-badge {
+      font-size: 10.5px;
+      padding: 1px 6px;
+      border-radius: 99px;
+      background: var(--bg-hover);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+    }
+
+    .btn-autoclean {
+      width: 100%;
+      height: 40px;
+      font-size: 13.5px;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      border-radius: var(--radius-md);
+      background: var(--text-primary);
+      color: #fff;
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(24, 24, 27, 0.16);
+      transition: background 0.15s ease, transform 0.08s ease;
+    }
+    .btn-autoclean:hover:not(:disabled) { background: #2c2c31; }
+    .btn-autoclean:active:not(:disabled) { transform: scale(0.99); }
+    .btn-autoclean:disabled { opacity: 0.42; cursor: not-allowed; box-shadow: none; }
+
+    .segmented {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 3px;
+      background: #eceae4;
+      padding: 3px;
+      border-radius: var(--radius-sm);
+      margin-top: 9px;
+    }
+    .segmented button {
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      font-family: inherit;
+      font-size: 11.5px;
+      font-weight: 500;
+      padding: 5px 4px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.14s ease;
+    }
+    .segmented button.active {
+      background: var(--bg-surface);
+      color: var(--text-primary);
+      font-weight: 600;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+    }
+
+    .control-row { display: flex; flex-direction: column; gap: 4px; margin-top: 9px; }
+    .control-label { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: var(--text-secondary); }
+    .control-val { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--text-primary); font-size: 11.5px; }
+    input[type="range"] { width: 100%; height: 4px; accent-color: var(--text-primary); cursor: pointer; margin: 2px 0; }
+    .check-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; font-size: 12px; color: var(--text-secondary); cursor: pointer; }
+    .check-row input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--text-primary); cursor: pointer; }
+    .hint-box { margin-top: 10px; padding: 8px 9px; border-radius: var(--radius-sm); background: #f2f0ea; color: var(--text-secondary); font-size: 11.5px; line-height: 1.5; }
+
+    .tool-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .tool-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4px;
+      padding: 8px 9px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background: var(--bg-surface);
+      color: var(--text-primary);
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.13s ease;
+      position: relative;
+      text-align: left;
+    }
+    .tool-btn:hover { background: var(--bg-hover); border-color: var(--border-strong); }
+    .tool-btn.active { background: var(--text-primary); border-color: var(--text-primary); color: #ffffff; }
+    .tool-btn.active .tool-key { background: rgba(255, 255, 255, 0.16); color: #e4e4e7; }
+    .tool-btn-top { display: flex; align-items: center; justify-content: space-between; width: 100%; }
+    .tool-name { font-size: 12px; font-weight: 600; line-height: 1.25; }
+    .tool-key { font-size: 10px; font-weight: 600; padding: 1px 5px; border-radius: 4px; background: var(--bg-hover); color: var(--text-muted); }
+    .tool-sub { font-size: 10.5px; opacity: 0.72; line-height: 1.2; }
+    .tool-btn.tool-restore.active { background: var(--accent); border-color: var(--accent); }
+    .tool-btn.tool-erase.active { background: #b91c1c; border-color: #b91c1c; }
+
+    .tool-options-card { margin-top: 10px; padding: 10px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-md); }
+    .tool-options-title { font-size: 11.5px; font-weight: 700; color: var(--text-primary); margin: 0 0 4px 0; }
+    .tool-options-desc { font-size: 11px; color: var(--text-muted); line-height: 1.45; margin: 0; }
+
+    .viewport {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      background: var(--bg-canvas);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 0;
+    }
+    .viewport.drag-over::after {
+      content: "放開滑鼠即可載入平面圖";
+      position: absolute;
+      inset: 16px;
+      border: 2.5px dashed var(--accent);
+      border-radius: 14px;
+      background: rgba(239, 246, 255, 0.88);
+      color: var(--accent);
+      font-size: 18px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 60;
+      pointer-events: none;
+    }
+
+    .stage-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      transform-origin: 0 0;
+      background: #ffffff;
+      box-shadow: var(--shadow-sheet);
+      display: none;
+    }
+    .stage-container.visible { display: block; }
+    .stage-canvas { position: absolute; top: 0; left: 0; display: block; }
+    #workCanvas { z-index: 1; background: #ffffff; }
+    #underlayCanvas { z-index: 2; pointer-events: none; mix-blend-mode: multiply; opacity: 0; transition: opacity 0.12s ease; }
+    #previewCanvas { z-index: 4; pointer-events: none; }
+    #labelsLayer { position: absolute; top: 0; left: 0; z-index: 5; overflow: visible; }
+
+    .plan-label {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      cursor: grab;
+      line-height: 1.18;
+      white-space: nowrap;
+      padding: 2px 5px;
+      border: 1.5px solid transparent;
+      border-radius: 4px;
+      user-select: none;
+      touch-action: none;
+    }
+    .plan-label:hover { border-color: rgba(37, 99, 235, 0.45); }
+    .plan-label.selected { border-color: var(--accent); background: rgba(37, 99, 235, 0.05); z-index: 10; }
+    .plan-label.dragging { cursor: grabbing; }
+    .plan-label-text { display: inline-block; pointer-events: none; }
+    .plan-label-edit {
+      font-family: inherit;
+      background: #ffffff;
+      border: 1px solid var(--accent);
+      border-radius: 3px;
+      outline: none;
+      padding: 0 4px;
+      min-width: 60px;
+      text-align: center;
+      color: inherit;
+      font-size: inherit;
+      font-weight: inherit;
+      letter-spacing: inherit;
+    }
+
+    .label-handle {
+      position: absolute;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+    }
+    .plan-label.selected .label-handle { display: flex; }
+    .handle-resize { width: 14px; height: 14px; right: -8px; bottom: -8px; background: var(--accent); border: 2px solid #fff; cursor: nwse-resize; }
+    .handle-delete { width: 18px; height: 18px; right: -10px; top: -10px; background: #dc2626; color: #fff; border: 1.5px solid #fff; font-size: 11px; font-weight: 700; line-height: 1; cursor: pointer; }
+
+    .empty-state {
+      max-width: 440px;
+      width: calc(100% - 32px);
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 32px 28px;
+      text-align: center;
+      box-shadow: var(--shadow-sheet);
+    }
+    .empty-icon {
+      width: 56px;
+      height: 56px;
+      margin: 0 auto 14px;
+      border-radius: 14px;
+      background: #f4f3ef;
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-primary);
+    }
+    .empty-title { font-size: 17px; font-weight: 700; margin: 0 0 8px 0; }
+    .empty-desc { font-size: 13px; color: var(--text-secondary); line-height: 1.65; margin: 0 0 20px 0; }
+    .empty-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+    .empty-actions .btn { height: 38px; padding: 0 16px; font-size: 13px; }
+    .empty-steps {
+      margin-top: 20px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      text-align: left;
+    }
+    .empty-step { font-size: 11.5px; color: var(--text-secondary); line-height: 1.45; }
+    .empty-step strong { display: block; color: var(--text-primary); margin-bottom: 2px; font-size: 12px; }
+
+    .viewport-hud {
+      position: absolute;
+      bottom: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(24, 24, 27, 0.86);
+      color: #f4f4f5;
+      padding: 6px 14px;
+      border-radius: 99px;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      z-index: 25;
+      pointer-events: none;
+      backdrop-filter: blur(6px);
+      white-space: nowrap;
+      max-width: 92%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .chips-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+    .preset-chip {
+      padding: 5px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg-surface);
+      color: var(--text-primary);
+      font-family: inherit;
+      font-size: 12.5px;
+      font-weight: 500;
+      cursor: grab;
+      transition: all 0.13s ease;
+      box-shadow: var(--shadow-sm);
+      touch-action: none;
+    }
+    .preset-chip:hover { background: var(--text-primary); border-color: var(--text-primary); color: #ffffff; transform: translateY(-1px); }
+    .preset-chip:active { cursor: grabbing; }
+
+    .custom-input-row { display: flex; gap: 6px; margin-top: 10px; }
+    .text-input {
+      flex: 1;
+      min-width: 0;
+      height: 32px;
+      padding: 0 9px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--bg-surface);
+      color: var(--text-primary);
+      font-family: inherit;
+      font-size: 12.5px;
+      outline: none;
+    }
+    .text-input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12); }
+
+    .weight-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 4px; }
+    .mini-pill {
+      height: 27px;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      background: var(--bg-surface);
+      color: var(--text-secondary);
+      font-family: inherit;
+      font-size: 11.5px;
+      cursor: pointer;
+    }
+    .mini-pill.active { background: var(--text-primary); border-color: var(--text-primary); color: #fff; font-weight: 600; }
+
+    .color-row { display: flex; align-items: center; gap: 7px; margin-top: 5px; }
+    .color-swatch {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      border: 2px solid transparent;
+      cursor: pointer;
+      box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18);
+    }
+    .color-swatch.active { border-color: var(--accent); transform: scale(1.1); }
+
+    .placed-list { display: flex; flex-direction: column; gap: 4px; max-height: 150px; overflow-y: auto; }
+    .placed-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 5px 8px;
+      border-radius: 5px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .placed-item.active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+    .placed-item-del { border: none; background: transparent; color: var(--text-muted); cursor: pointer; font-size: 14px; line-height: 1; padding: 0 3px; }
+    .placed-item-del:hover { color: var(--danger); }
+
+    .drag-ghost {
+      position: fixed;
+      pointer-events: none;
+      z-index: 9999;
+      transform: translate(-50%, -50%);
+      padding: 4px 10px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.94);
+      border: 1.5px solid var(--accent);
+      color: var(--text-primary);
+      font-weight: 500;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.16);
+      display: none;
+      white-space: nowrap;
+    }
+
+    .toast {
+      position: fixed;
+      top: 64px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-10px);
+      background: #18181b;
+      color: #ffffff;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 12.5px;
+      font-weight: 500;
+      z-index: 100;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.18s ease, transform 0.18s ease;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    .busy-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(250, 249, 246, 0.7);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 50;
+      backdrop-filter: blur(2px);
+    }
+    .busy-overlay.show { display: flex; }
+    .busy-card {
+      background: #ffffff;
+      border: 1px solid var(--border);
+      padding: 14px 22px;
+      border-radius: 10px;
+      box-shadow: var(--shadow-sheet);
+      font-size: 13px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid #d4d4d8;
+      border-top-color: #18181b;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .underlay-bar {
+      display: none;
+      align-items: center;
+      gap: 6px;
+      padding: 0 8px;
+      height: 32px;
+      background: var(--accent-soft);
+      border: 1px solid #bfdbfe;
+      border-radius: var(--radius-sm);
+      font-size: 11.5px;
+      color: var(--accent);
+    }
+    .underlay-bar.show { display: inline-flex; }
+    .underlay-bar input[type="range"] { width: 68px; accent-color: var(--accent); }
+
+    @media (max-width: 1020px) {
+      .panel-left { width: 215px; }
+      .panel-right { width: 224px; }
+      .hide-md { display: none; }
+    }
+    @media (max-width: 780px) {
+      .workspace { flex-direction: column; }
+      .panel-left, .panel-right { width: 100%; max-height: 220px; border: none; border-bottom: 1px solid var(--border); }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="topbar-group">
+        <div class="brand">
+          <div class="brand-icon" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="1"/>
+              <path d="M3 12h9v9"/>
+              <path d="M12 3v5"/>
+            </svg>
+          </div>
+          <h1 class="brand-title">格局清圖工坊<span class="brand-sub">免費平面圖清圖與標註</span></h1>
+        </div>
+
+        <input id="fileInput" type="file" accept="image/*" hidden />
+        <button id="btnUpload" class="btn btn-primary" title="上傳平面圖 (支援拖曳或 Ctrl+V 貼上)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          上傳平面圖
+        </button>
+        <button id="btnDemo" class="btn" title="載入內建範例平面圖快速測試">載入範例圖</button>
+      </div>
+
+      <div class="topbar-group">
+        <button id="btnUndo" class="btn btn-icon" title="復原 (Ctrl+Z)" disabled>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
+        </button>
+        <button id="btnRedo" class="btn btn-icon" title="重做 (Ctrl+Y)" disabled>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"/></svg>
+        </button>
+
+        <div class="divider-v"></div>
+
+        <button id="btnRotateL" class="btn btn-icon" title="逆時針旋轉 90°" disabled>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+        </button>
+        <button id="btnRotateR" class="btn btn-icon" title="順時針旋轉 90°" disabled>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>
+        </button>
+
+        <div class="divider-v"></div>
+
+        <button id="btnUnderlay" class="btn btn-toggle" title="以淡藍色疊顯原圖，方便對照補回廁所設備或補畫牆線" disabled>
+          原圖透底
+        </button>
+        <div id="underlayBar" class="underlay-bar">
+          <span>透度</span>
+          <input id="underlayOpacity" type="range" min="10" max="75" value="28" />
+        </div>
+        <button id="btnPeekOrig" class="btn hide-md" title="按住暫時檢視原始圖片" disabled>按住看原圖</button>
+
+        <div class="divider-v"></div>
+
+        <button id="btnZoomOut" class="btn btn-icon" title="縮小" disabled>−</button>
+        <span id="zoomReadout" class="zoom-readout" title="點擊符合視窗">100%</span>
+        <button id="btnZoomIn" class="btn btn-icon" title="放大" disabled>+</button>
+      </div>
+
+      <div class="topbar-group">
+        <button id="btnCopyImg" class="btn hide-md" title="複製成品圖片到剪貼簿" disabled>複製圖片</button>
+        <button id="btnExportJpg" class="btn hide-md" title="下載純白底 JPG" disabled>JPG</button>
+        <button id="btnExportPng" class="btn btn-accent" title="下載高畫質純白底 PNG（含文字標籤）" disabled>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          下載 PNG
+        </button>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <aside class="panel panel-left">
+        <section class="panel-section">
+          <div class="section-header">
+            <h2 class="section-title">一鍵清圖</h2>
+            <span class="section-badge">純本機免費</span>
+          </div>
+
+          <button id="btnAutoClean" class="btn-autoclean" disabled>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2z"/></svg>
+            一鍵智慧清圖
+          </button>
+
+          <div class="segmented" role="group" aria-label="清圖模式">
+            <button id="modeSmart" class="active" data-mode="smart">智慧保留衛浴</button>
+            <button id="modeWalls" data-mode="walls">極淨純牆線</button>
+          </div>
+
+          <label class="check-row">
+            <span>保留門窗與陽台外框</span>
+            <input id="optKeepOpenings" type="checkbox" checked />
+          </label>
+
+          <label class="check-row">
+            <span>圖底非白／彩底一律轉白</span>
+            <input id="optWhiteBg" type="checkbox" checked />
+          </label>
+
+          <div class="control-row">
+            <div class="control-label">
+              <span>隔間牆厚度門檻</span>
+              <span id="valWallThick" class="control-val">2 px</span>
+            </div>
+            <input id="optWallThick" type="range" min="1" max="5" step="1" value="2" />
+          </div>
+
+          <div class="control-row">
+            <div class="control-label">
+              <span>黑線濃淡靈敏度</span>
+              <span id="valDarkThresh" class="control-val">125</span>
+            </div>
+            <input id="optDarkThresh" type="range" min="65" max="185" step="5" value="125" />
+          </div>
+
+          <div class="hint-box">
+            若隔間牆偏細或偏粗，微調滑桿後再按一次「一鍵智慧清圖」即可重新計算。
+          </div>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-header">
+            <h2 class="section-title">手動精修工具</h2>
+            <span class="section-badge">誤差秒修</span>
+          </div>
+
+          <div class="tool-grid" id="toolGrid">
+            <button class="tool-btn active" data-tool="select">
+              <div class="tool-btn-top">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3l14 9-7 1-4 7-3-17z"/></svg>
+                <span class="tool-key">V</span>
+              </div>
+              <span class="tool-name">選取／移字</span>
+              <span class="tool-sub">拖曳調整標籤</span>
+            </button>
+
+            <button class="tool-btn tool-erase" data-tool="boxErase">
+              <div class="tool-btn-top">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" stroke-dasharray="4 3"/></svg>
+                <span class="tool-key">E</span>
+              </div>
+              <span class="tool-name">框選清除</span>
+              <span class="tool-sub">框內直接轉白</span>
+            </button>
+
+            <button class="tool-btn tool-erase" data-tool="brushErase">
+              <div class="tool-btn-top">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 20H7L3 16c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5 5c1 1 1 2.5 0 3.4L13 19"/></svg>
+                <span class="tool-key">B</span>
+              </div>
+              <span class="tool-name">白色橡皮擦</span>
+              <span class="tool-sub">塗抹擦除雜點</span>
+            </button>
+
+            <button class="tool-btn tool-erase" data-tool="magicErase">
+              <div class="tool-btn-top">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 4V2M15 16v-2M8 9h2M20 9h2M17.8 11.8L19 13M17.8 6.2L19 5M3 21l9-9M12.2 6.2L11 5"/></svg>
+                <span class="tool-key">W</span>
+              </div>
+              <span class="tool-name">魔術棒去塊</span>
+              <span class="tool-sub">單擊刪除物件</span>
+            </button>
+
+            <button class="tool-btn tool-restore" data-tool="boxRestore">
+              <div class="tool-btn-top">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 12h6M12 9v6"/></svg>
+                <span class="tool-key">R</span>
+              </div>
+              <span class="tool-name">框選還原</span>
+              <span class="tool-sub">拉回衛浴設備</span>
+            </button>
+
+            <button class="tool-btn tool-restore" data-tool="brushRestore">
+              <div class="tool-btn-top">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/></svg>
+                <span class="tool-key">T</span>
+              </div>
+              <span class="tool-name">筆刷還原</span>
+              <span class="tool-sub">補回局部線條</span>
+            </button>
+
+            <button class="tool-btn" data-tool="wallLine">
+              <div class="tool-btn-top">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><line x1="4" y1="20" x2="20" y2="4"/></svg>
+                <span class="tool-key">L</span>
+              </div>
+              <span class="tool-name">直線黑牆</span>
+              <span class="tool-sub">補畫隔間黑線</span>
+            </button>
+
+            <button class="tool-btn" data-tool="blackPen">
+              <div class="tool-btn-top">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+                <span class="tool-key">P</span>
+              </div>
+              <span class="tool-name">自由黑筆</span>
+              <span class="tool-sub">手繪補黑線</span>
+            </button>
+          </div>
+
+          <div id="toolOptionsCard" class="tool-options-card">
+            <p id="toolOptTitle" class="tool-options-title">選取與文字拖曳</p>
+            <p id="toolOptDesc" class="tool-options-desc">點擊文字即可拖曳位置、拖曳右下藍點縮放大小，雙擊可直接編輯文字。按住空白鍵可平移畫布。</p>
+
+            <div id="optBrushWrap" class="control-row" style="display:none;">
+              <div class="control-label">
+                <span>筆刷／線條粗細</span>
+                <span id="valBrushSize" class="control-val">18 px</span>
+              </div>
+              <input id="optBrushSize" type="range" min="2" max="80" value="18" />
+            </div>
+
+            <div id="optLineWrap" class="control-row" style="display:none;">
+              <div class="control-label">
+                <span>黑牆線寬</span>
+                <span id="valLineWidth" class="control-val">8 px</span>
+              </div>
+              <input id="optLineWidth" type="range" min="1" max="24" value="8" />
+              <label class="check-row" style="margin-top:4px;">
+                <span>水平／垂直自動吸附</span>
+                <input id="optOrthoSnap" type="checkbox" checked />
+              </label>
+            </div>
+
+            <div id="optRestoreWrap" class="control-row" style="display:none;">
+              <div class="control-label">
+                <span>還原黑線門檻</span>
+                <span id="valRestoreThresh" class="control-val">195</span>
+              </div>
+              <input id="optRestoreThresh" type="range" min="110" max="235" value="195" />
+            </div>
+          </div>
+        </section>
+      </aside>
+
+      <section class="viewport" id="viewport">
+        <div id="emptyState" class="empty-state">
+          <div class="empty-icon">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2"/>
+              <path d="M3 13h8v8"/>
+              <path d="M11 3v6h10"/>
+              <circle cx="16.5" cy="16.5" r="2"/>
+            </svg>
+          </div>
+          <h2 class="empty-title">上傳房地產平面格局圖開始清圖</h2>
+          <p class="empty-desc">
+            支援 PNG、JPG、WEBP 圖片；可直接<strong>拖曳檔案至此處</strong>，或按 <strong>Ctrl+V</strong> 貼上截圖。<br/>
+            所有處理皆在您的瀏覽器本機完成，完全免費、免註冊、不上傳伺服器。
+          </p>
+          <div class="empty-actions">
+            <button id="btnEmptyUpload" class="btn btn-primary">選擇平面圖檔案</button>
+            <button id="btnEmptyDemo" class="btn">載入範例圖立即體驗</button>
+          </div>
+          <div class="empty-steps">
+            <div class="empty-step">
+              <strong>1. 一鍵清圖</strong>
+              圖底自動轉白、隔間牆純黑化並保留衛浴設備
+            </div>
+            <div class="empty-step">
+              <strong>2. 局部精修</strong>
+              框選清除雜物、框選還原廁所或直線補牆
+            </div>
+            <div class="empty-step">
+              <strong>3. 拖曳標註</strong>
+              拖放客廳／臥室／衛浴字眼、調大小後下載
+            </div>
+          </div>
+        </div>
+
+        <div id="stageContainer" class="stage-container">
+          <canvas id="workCanvas" class="stage-canvas"></canvas>
+          <canvas id="underlayCanvas" class="stage-canvas"></canvas>
+          <canvas id="previewCanvas" class="stage-canvas"></canvas>
+          <div id="labelsLayer"></div>
+        </div>
+
+        <div id="busyOverlay" class="busy-overlay">
+          <div class="busy-card">
+            <div class="spinner"></div>
+            <span id="busyText">正在智慧清圖中…</span>
+          </div>
+        </div>
+
+        <div id="viewportHud" class="viewport-hud" style="display:none;">
+          <span id="hudToolText">目前工具：選取／移字</span>
+          <span style="opacity:0.45">|</span>
+          <span>滾輪縮放・按住空白鍵平移・Ctrl+Z 復原</span>
+        </div>
+      </section>
+
+      <aside class="panel panel-right">
+        <section class="panel-section">
+          <div class="section-header">
+            <h2 class="section-title">空間字眼標籤</h2>
+            <span class="section-badge">拖曳或點擊</span>
+          </div>
+
+          <div id="presetChips" class="chips-grid"></div>
+
+          <div class="custom-input-row">
+            <input id="customLabelInput" class="text-input" type="text" placeholder="自行輸入文字（如：玄關）" maxlength="30" />
+            <button id="btnAddCustom" class="btn btn-primary">加入</button>
+          </div>
+        </section>
+
+        <section class="panel-section" id="labelInspector">
+          <div class="section-header">
+            <h2 class="section-title">文字樣式調整</h2>
+            <span id="inspectorStatus" class="section-badge">預設樣式</span>
+          </div>
+
+          <div class="control-row" style="margin-top:0;">
+            <div class="control-label"><span>文字內容</span></div>
+            <input id="inspText" class="text-input" type="text" placeholder="點選圖上標籤即可編輯" disabled />
+          </div>
+
+          <div class="control-row">
+            <div class="control-label">
+              <span>文字大小</span>
+              <span id="valFontSize" class="control-val">36 px</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <button id="btnFontMinus" class="btn btn-icon" style="height:26px;width:26px;" title="縮小字體">−</button>
+              <input id="inspFontSize" type="range" min="12" max="120" value="36" />
+              <button id="btnFontPlus" class="btn btn-icon" style="height:26px;width:26px;" title="放大字體">+</button>
+            </div>
+          </div>
+
+          <div class="control-row">
+            <div class="control-label"><span>字體粗細</span></div>
+            <div class="weight-grid" id="weightGrid">
+              <button class="mini-pill active" data-weight="300">細體</button>
+              <button class="mini-pill" data-weight="400">標準</button>
+              <button class="mini-pill" data-weight="600">中粗</button>
+              <button class="mini-pill" data-weight="700">粗體</button>
+            </div>
+          </div>
+
+          <div class="control-row">
+            <div class="control-label">
+              <span>字距</span>
+              <span id="valLetterSpacing" class="control-val">2 px</span>
+            </div>
+            <input id="inspLetterSpacing" type="range" min="0" max="14" value="2" />
+          </div>
+
+          <div class="control-row">
+            <div class="control-label"><span>文字顏色</span></div>
+            <div class="color-row" id="colorSwatches">
+              <button class="color-swatch active" data-color="#111111" style="background:#111111" title="純黑"></button>
+              <button class="color-swatch" data-color="#444444" style="background:#444444" title="深灰"></button>
+              <button class="color-swatch" data-color="#b91c1c" style="background:#b91c1c" title="標註紅"></button>
+              <button class="color-swatch" data-color="#1d4ed8" style="background:#1d4ed8" title="圖紙藍"></button>
+              <input id="inspColorPicker" type="color" value="#111111" style="width:26px;height:24px;border:none;background:none;cursor:pointer;padding:0;" title="自訂顏色" />
+            </div>
+          </div>
+
+          <div class="control-row">
+            <div class="control-label"><span>旋轉角度</span></div>
+            <div class="weight-grid" style="grid-template-columns:repeat(3,1fr);" id="rotGrid">
+              <button class="mini-pill active" data-rot="0">0° 橫排</button>
+              <button class="mini-pill" data-rot="-90">-90°</button>
+              <button class="mini-pill" data-rot="90">90°</button>
+            </div>
+          </div>
+
+          <label class="check-row">
+            <span>純白底襯（避免線條干擾文字）</span>
+            <input id="inspWhiteBg" type="checkbox" />
+          </label>
+
+          <div style="display:flex;gap:6px;margin-top:12px;">
+            <button id="btnSyncStyleAll" class="btn" style="flex:1;font-size:11.5px;" title="將目前字體大小與樣式套用到圖上所有文字" disabled>套用至全部文字</button>
+            <button id="btnDeleteLabel" class="btn btn-danger-ghost" style="font-size:11.5px;" disabled>刪除</button>
+          </div>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-header">
+            <h2 class="section-title">圖紙上的標籤</h2>
+            <span id="placedCount" class="section-badge">0</span>
+          </div>
+          <div id="placedList" class="placed-list">
+            <div style="font-size:11.5px;color:var(--text-muted);padding:4px 0;">尚未加入標籤，可從上方拖曳或點擊字眼。</div>
+          </div>
+          <button id="btnClearLabels" class="btn btn-danger-ghost" style="width:100%;margin-top:8px;font-size:11.5px;display:none;">清除全部文字標籤</button>
+        </section>
+      </aside>
+    </main>
+  </div>
+
+  <div id="dragGhost" class="drag-ghost"></div>
+  <div id="toast" class="toast"></div>
+
+  <script>
+    (() => {
+      'use strict';
+
+      const PRESET_LABELS = [
+        '客廳', '廚房',
+        '臥室1', '臥室2', '臥室3', '臥室4',
+        '衛浴1', '衛浴2', '衛浴3',
+        '陽台', '工作陽台'
+      ];
+
+      const TOOL_INFO = {
+        select: {
+          title: '選取與拖曳文字',
+          desc: '點擊圖上標籤即可拖曳位置、拖曳右下藍點縮放大小，雙擊直接修改文字。方向鍵可微調位置。'
+        },
+        boxErase: {
+          title: '框選清除（純白）',
+          desc: '在圖紙上拉出矩形框，框內所有家具、地板線或標記會立刻清除成純白底。'
+        },
+        brushErase: {
+          title: '白色橡皮擦',
+          desc: '拖曳塗抹局部細線、殘留家具線或雜點，將塗抹區域轉為純白。'
+        },
+        magicErase: {
+          title: '魔術棒去塊（單擊）',
+          desc: '點擊不要的獨立家具圖示或文字，自動偵測並整塊清除（內建主隔間牆防誤刪保護）。'
+        },
+        boxRestore: {
+          title: '框選還原原圖（白底黑線）',
+          desc: '拉框將該區域從原圖還原成乾淨黑線！可先開啟上方「原圖透底」，精準框回廁所設備或門窗。'
+        },
+        brushRestore: {
+          title: '筆刷還原原圖',
+          desc: '塗抹局部區域以白底黑線還原原圖線條，適合修補馬桶、洗手台、門扇弧線或斷線。'
+        },
+        wallLine: {
+          title: '直線黑牆',
+          desc: '拖曳拉出筆直純黑隔間牆線，預設水平／垂直吸附（按住 Shift 可畫任意斜線）。'
+        },
+        blackPen: {
+          title: '自由黑筆',
+          desc: '自由繪製純黑線條，適合補畫牆角或細節。'
+        }
+      };
+
+      const state = {
+        hasImage: false,
+        imgW: 0,
+        imgH: 0,
+        zoom: 1,
+        panX: 0,
+        panY: 0,
+        tool: 'select',
+        cleanMode: 'smart',
+        keepOpenings: true,
+        whiteBg: true,
+        wallThick: 2,
+        darkThresh: 125,
+        brushSize: 18,
+        lineWidth: 8,
+        orthoSnap: true,
+        restoreThresh: 195,
+        underlayOn: false,
+        underlayOpacity: 0.28,
+        peekingOrig: false,
+        labels: [],
+        selectedLabelId: null,
+        nextLabelId: 1,
+        defaultStyle: {
+          fontSize: 36,
+          fontWeight: '300',
+          letterSpacing: 2,
+          color: '#111111',
+          rotation: 0,
+          whiteBg: false
+        },
+        history: [],
+        historyIdx: -1,
+        maxHistory: 25,
+        spaceDown: false,
+        isPanning: false,
+        panStart: null,
+        isDrawing: false,
+        drawStart: null,
+        drawLast: null,
+        cursorPt: null
+      };
+
+      const $ = (id) => document.getElementById(id);
+      const fileInput = $('fileInput');
+      const viewport = $('viewport');
+      const emptyState = $('emptyState');
+      const stageContainer = $('stageContainer');
+      const workCanvas = $('workCanvas');
+      const workCtx = workCanvas.getContext('2d', { willReadFrequently: true });
+      const underlayCanvas = $('underlayCanvas');
+      const underlayCtx = underlayCanvas.getContext('2d', { willReadFrequently: true });
+      const previewCanvas = $('previewCanvas');
+      const previewCtx = previewCanvas.getContext('2d');
+      const labelsLayer = $('labelsLayer');
+      const busyOverlay = $('busyOverlay');
+      const busyText = $('busyText');
+      const viewportHud = $('viewportHud');
+      const hudToolText = $('hudToolText');
+      const dragGhost = $('dragGhost');
+      const toastEl = $('toast');
+
+      const origCanvas = document.createElement('canvas');
+      const origCtx = origCanvas.getContext('2d', { willReadFrequently: true });
+      const cleanRefCanvas = document.createElement('canvas');
+      const cleanRefCtx = cleanRefCanvas.getContext('2d', { willReadFrequently: true });
+
+      let toastTimer = null;
+      function showToast(msg, ms = 2400) {
+        toastEl.textContent = msg;
+        toastEl.classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => toastEl.classList.remove('show'), ms);
+      }
+
+      function setBusy(flag, text = '正在處理中…') {
+        busyText.textContent = text;
+        busyOverlay.classList.toggle('show', flag);
+      }
+
+      function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
+
+      function clientToImage(clientX, clientY) {
+        const rect = viewport.getBoundingClientRect();
+        return {
+          x: (clientX - rect.left - state.panX) / state.zoom,
+          y: (clientY - rect.top - state.panY) / state.zoom
+        };
+      }
+
+      function updateStageTransform() {
+        stageContainer.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoom})`;
+        $('zoomReadout').textContent = Math.round(state.zoom * 100) + '%';
+      }
+
+      function fitToViewport() {
+        if (!state.hasImage) return;
+        const rect = viewport.getBoundingClientRect();
+        const pad = 44;
+        const availW = Math.max(120, rect.width - pad * 2);
+        const availH = Math.max(120, rect.height - pad * 2);
+        const z = Math.min(availW / state.imgW, availH / state.imgH, 1.5);
+        state.zoom = clamp(z, 0.1, 5);
+        state.panX = (rect.width - state.imgW * state.zoom) / 2;
+        state.panY = (rect.height - state.imgH * state.zoom) / 2;
+        updateStageTransform();
+      }
+
+      function zoomAt(factor, clientX, clientY) {
+        if (!state.hasImage) return;
+        const rect = viewport.getBoundingClientRect();
+        const vx = clientX !== undefined ? clientX - rect.left : rect.width / 2;
+        const vy = clientY !== undefined ? clientY - rect.top : rect.height / 2;
+        const imgX = (vx - state.panX) / state.zoom;
+        const imgY = (vy - state.panY) / state.zoom;
+        state.zoom = clamp(state.zoom * factor, 0.12, 8);
+        state.panX = vx - imgX * state.zoom;
+        state.panY = vy - imgY * state.zoom;
+        updateStageTransform();
+      }
+
+      function setImageEnabledUI(enabled) {
+        const ids = [
+          'btnAutoClean', 'btnRotateL', 'btnRotateR', 'btnUnderlay',
+          'btnPeekOrig', 'btnZoomOut', 'btnZoomIn',
+          'btnCopyImg', 'btnExportJpg', 'btnExportPng'
+        ];
+        ids.forEach((id) => { $(id).disabled = !enabled; });
+        emptyState.style.display = enabled ? 'none' : 'block';
+        stageContainer.classList.toggle('visible', enabled);
+        viewportHud.style.display = enabled ? 'flex' : 'none';
+      }
+
+      function pushHistory() {
+        if (!state.hasImage) return;
+        const snap = {
+          w: state.imgW,
+          h: state.imgH,
+          workData: workCtx.getImageData(0, 0, state.imgW, state.imgH),
+          origData: origCtx.getImageData(0, 0, state.imgW, state.imgH),
+          labels: JSON.parse(JSON.stringify(state.labels)),
+          selectedLabelId: state.selectedLabelId
+        };
+        if (state.historyIdx < state.history.length - 1) {
+          state.history = state.history.slice(0, state.historyIdx + 1);
+        }
+        state.history.push(snap);
+        if (state.history.length > state.maxHistory) state.history.shift();
+        state.historyIdx = state.history.length - 1;
+        updateHistoryButtons();
+      }
+
+      function restoreSnapshot(snap) {
+        resizeCanvases(snap.w, snap.h);
+        workCtx.putImageData(snap.workData, 0, 0);
+        origCtx.putImageData(snap.origData, 0, 0);
+        rebuildUnderlayAndCleanRef();
+        state.labels = JSON.parse(JSON.stringify(snap.labels));
+        state.selectedLabelId = snap.selectedLabelId;
+        renderLabels();
+        syncInspector();
+        updateHistoryButtons();
+      }
+
+      function undo() {
+        if (state.historyIdx <= 0) return;
+        state.historyIdx--;
+        restoreSnapshot(state.history[state.historyIdx]);
+        showToast('已復原上一步', 1400);
+      }
+
+      function redo() {
+        if (state.historyIdx >= state.history.length - 1) return;
+        state.historyIdx++;
+        restoreSnapshot(state.history[state.historyIdx]);
+        showToast('已重做', 1400);
+      }
+
+      function updateHistoryButtons() {
+        $('btnUndo').disabled = state.historyIdx <= 0;
+        $('btnRedo').disabled = state.historyIdx >= state.history.length - 1;
+      }
+
+      function resizeCanvases(w, h) {
+        state.imgW = w;
+        state.imgH = h;
+        [workCanvas, underlayCanvas, previewCanvas, origCanvas, cleanRefCanvas].forEach((c) => {
+          c.width = w;
+          c.height = h;
+        });
+        stageContainer.style.width = w + 'px';
+        stageContainer.style.height = h + 'px';
+        labelsLayer.style.width = w + 'px';
+        labelsLayer.style.height = h + 'px';
+      }
+
+      function buildNormalizedGray(srcImageData, whiteBgMode) {
+        const { width: w, height: h, data } = srcImageData;
+        const n = w * h;
+        const lumArr = new Uint8Array(n);
+        const satArr = new Uint8Array(n);
+        const hist = new Uint32Array(256);
+
+        for (let i = 0, p = 0; i < n; i++, p += 4) {
+          const a = data[p + 3];
+          let r = data[p], g = data[p + 1], b = data[p + 2];
+          if (a < 255) {
+            const af = a / 255;
+            r = Math.round(r * af + 255 * (1 - af));
+            g = Math.round(g * af + 255 * (1 - af));
+            b = Math.round(b * af + 255 * (1 - af));
+          }
+          const lum = (77 * r + 150 * g + 29 * b) >> 8;
+          const mx = r > g ? (r > b ? r : b) : (g > b ? g : b);
+          const mn = r < g ? (r < b ? r : b) : (g < b ? g : b);
+          lumArr[i] = lum;
+          satArr[i] = mx - mn;
+          hist[lum]++;
+        }
+
+        let acc = 0;
+        let bgPoint = 250;
+        const target85 = n * 0.85;
+        for (let v = 0; v < 256; v++) {
+          acc += hist[v];
+          if (acc >= target85) {
+            bgPoint = Math.max(170, v);
+            break;
+          }
+        }
+
+        const scale = whiteBgMode && bgPoint < 246 ? 255 / bgPoint : 1;
+        const gray = new Uint8Array(n);
+        for (let i = 0; i < n; i++) {
+          let v = lumArr[i];
+          if (scale !== 1) v = Math.min(255, Math.round(v * scale));
+          if (whiteBgMode && satArr[i] > 28 && v > 105) v = 255;
+          gray[i] = v;
+        }
+        return gray;
+      }
+
+      function rebuildUnderlayAndCleanRef() {
+        const w = state.imgW, h = state.imgH;
+        const src = origCtx.getImageData(0, 0, w, h);
+        const gray = buildNormalizedGray(src, true);
+
+        const uImg = underlayCtx.createImageData(w, h);
+        const cImg = cleanRefCtx.createImageData(w, h);
+        const ud = uImg.data;
+        const cd = cImg.data;
+        const rThresh = state.restoreThresh;
+
+        for (let i = 0, p = 0; i < w * h; i++, p += 4) {
+          const g = gray[i];
+          if (g < 225) {
+            const strength = 1 - g / 225;
+            ud[p] = Math.round(255 - strength * 195);
+            ud[p + 1] = Math.round(255 - strength * 120);
+            ud[p + 2] = 255;
+            ud[p + 3] = 255;
+          } else {
+            ud[p] = ud[p + 1] = ud[p + 2] = ud[p + 3] = 255;
+          }
+
+          let cv = 255;
+          if (g < rThresh) {
+            cv = g < rThresh - 55 ? 0 : Math.round(((g - (rThresh - 55)) / 55) * 235);
+          }
+          cd[p] = cd[p + 1] = cd[p + 2] = cv;
+          cd[p + 3] = 255;
+        }
+        underlayCtx.putImageData(uImg, 0, 0);
+        cleanRefCtx.putImageData(cImg, 0, 0);
+        applyUnderlayVisibility();
+      }
+
+      function applyUnderlayVisibility() {
+        if (state.peekingOrig) {
+          underlayCanvas.style.mixBlendMode = 'normal';
+          underlayCanvas.style.opacity = '1';
+          underlayCtx.drawImage(origCanvas, 0, 0);
+          return;
+        }
+        underlayCanvas.style.mixBlendMode = 'multiply';
+        underlayCanvas.style.opacity = state.underlayOn ? String(state.underlayOpacity) : '0';
+      }
+
+      function loadImageElement(img, label = '已載入平面圖') {
+        const maxDim = 2000;
+        let w = img.naturalWidth || img.width;
+        let h = img.naturalHeight || img.height;
+        if (w > maxDim || h > maxDim) {
+          const ratio = Math.min(maxDim / w, maxDim / h);
+          w = Math.round(w * ratio);
+          h = Math.round(h * ratio);
+        }
+
+        resizeCanvases(w, h);
+        origCtx.fillStyle = '#ffffff';
+        origCtx.fillRect(0, 0, w, h);
+        origCtx.drawImage(img, 0, 0, w, h);
+
+        workCtx.drawImage(origCanvas, 0, 0);
+        rebuildUnderlayAndCleanRef();
+
+        state.defaultStyle.fontSize = clamp(Math.round(Math.min(w, h) * 0.042), 20, 64);
+        state.labels = [];
+        state.selectedLabelId = null;
+        state.hasImage = true;
+        state.history = [];
+        state.historyIdx = -1;
+
+        setImageEnabledUI(true);
+        renderLabels();
+        syncInspector();
+        fitToViewport();
+        pushHistory();
+        showToast(`${label}（${w}×${h}），點擊左側「一鍵智慧清圖」開始！`, 3000);
+      }
+
+      function loadImageFile(file) {
+        if (!file || !file.type.startsWith('image/')) {
+          showToast('請上傳圖片檔案（PNG / JPG / WEBP）');
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => loadImageElement(img, `已載入「${file.name}」`);
+          img.onerror = () => showToast('圖片載入失敗，請確認檔案格式');
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+
+      function generateDemoFloorPlan() {
+        const w = 1020, h = 920;
+        const c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        const ctx = c.getContext('2d');
+
+        ctx.fillStyle = '#f5f1e6';
+        ctx.fillRect(0, 0, w, h);
+
+        ctx.fillStyle = '#efe5d0';
+        ctx.fillRect(100, 120, 820, 440);
+        ctx.fillRect(580, 560, 340, 240);
+
+        ctx.fillStyle = '#e5eef5';
+        ctx.fillRect(100, 560, 230, 145);
+        ctx.fillRect(330, 560, 220, 145);
+
+        ctx.strokeStyle = '#a89f91';
+        ctx.lineWidth = 1;
+        for (let x = 116; x < 915; x += 18) {
+          ctx.beginPath(); ctx.moveTo(x, 125); ctx.lineTo(x, 555); ctx.stroke();
+        }
+        for (let x = 596; x < 915; x += 18) {
+          ctx.beginPath(); ctx.moveTo(x, 565); ctx.lineTo(x, 795); ctx.stroke();
+        }
+
+        ctx.strokeStyle = '#444444';
+        ctx.lineWidth = 1.4;
+        ctx.fillStyle = '#faf8f2';
+
+        ctx.fillRect(128, 190, 195, 165); ctx.strokeRect(128, 190, 195, 165);
+        ctx.strokeRect(138, 205, 42, 60); ctx.strokeRect(138, 280, 42, 60);
+        ctx.beginPath(); ctx.moveTo(195, 190); ctx.lineTo(195, 355); ctx.stroke();
+        ctx.fillRect(118, 488, 165, 46); ctx.strokeRect(118, 488, 165, 46);
+        for (let x = 135; x < 275; x += 18) {
+          ctx.beginPath(); ctx.moveTo(x, 494); ctx.lineTo(x + 8, 528); ctx.stroke();
+        }
+
+        ctx.fillRect(378, 165, 155, 125); ctx.strokeRect(378, 165, 155, 125);
+        ctx.strokeRect(386, 185, 36, 75);
+        ctx.fillRect(378, 315, 48, 95); ctx.strokeRect(378, 315, 48, 95);
+
+        ctx.fillRect(610, 145, 72, 270); ctx.strokeRect(610, 145, 72, 270);
+        ctx.fillRect(682, 145, 115, 68); ctx.strokeRect(682, 145, 115, 68);
+        ctx.beginPath(); ctx.ellipse(760, 310, 34, 58, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.fillRect(635, 515, 130, 82); ctx.strokeRect(635, 515, 130, 82);
+        ctx.strokeRect(652, 495, 36, 16); ctx.strokeRect(708, 495, 36, 16);
+        ctx.strokeRect(652, 601, 36, 16); ctx.strokeRect(708, 601, 36, 16);
+
+        ctx.fillStyle = '#666';
+        ctx.font = '15px sans-serif';
+        ctx.fillText('主臥室 4.2坪', 175, 415);
+        ctx.fillText('次臥 3.1坪', 415, 440);
+        ctx.fillText('客餐廳 8.5坪', 715, 445);
+        ctx.fillText('380 cm', 460, 92);
+
+        ctx.strokeStyle = '#111111';
+        ctx.lineWidth = 1.6;
+        ctx.beginPath(); ctx.moveTo(165, 560); ctx.lineTo(165, 700); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(165, 575); ctx.lineTo(132, 605); ctx.arc(165, 575, 44, Math.PI * 0.75, Math.PI * 0.5, true); ctx.stroke();
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(184, 672, 40, 22); ctx.strokeRect(184, 672, 40, 22);
+        ctx.beginPath(); ctx.ellipse(204, 646, 17, 25, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.fillRect(245, 636, 72, 58); ctx.strokeRect(245, 636, 72, 58);
+        ctx.beginPath(); ctx.ellipse(281, 665, 24, 18, 0, 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath(); ctx.arc(281, 672, 4, 0, Math.PI * 2); ctx.stroke();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(350, 672, 40, 22); ctx.strokeRect(350, 672, 40, 22);
+        ctx.beginPath(); ctx.ellipse(370, 646, 17, 25, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.fillRect(408, 636, 68, 58); ctx.strokeRect(408, 636, 68, 58);
+        ctx.beginPath(); ctx.ellipse(442, 665, 22, 17, 0, 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(486, 560); ctx.lineTo(486, 700); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(486, 575); ctx.lineTo(520, 605); ctx.stroke();
+
+        ctx.strokeStyle = '#222';
+        ctx.fillRect(380, 745, 285, 50); ctx.strokeRect(380, 745, 285, 50);
+        ctx.strokeRect(395, 753, 72, 34);
+        ctx.beginPath(); ctx.arc(415, 770, 10, 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath(); ctx.arc(447, 770, 10, 0, Math.PI * 2); ctx.stroke();
+        ctx.strokeRect(525, 752, 74, 36);
+        ctx.beginPath(); ctx.arc(562, 770, 6, 0, Math.PI * 2); ctx.stroke();
+
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(72, 80, 76, 80); ctx.fillRect(872, 80, 76, 80);
+        ctx.fillRect(72, 760, 76, 80); ctx.fillRect(872, 760, 76, 80);
+
+        ctx.fillRect(148, 114, 155, 14); ctx.fillRect(385, 114, 215, 14); ctx.fillRect(780, 114, 92, 14);
+        ctx.fillRect(96, 160, 14, 395); ctx.fillRect(96, 650, 14, 110);
+        ctx.fillRect(910, 160, 14, 480); ctx.fillRect(148, 798, 724, 14);
+
+        ctx.fillRect(354, 128, 12, 338); ctx.fillRect(354, 454, 130, 12); ctx.fillRect(584, 128, 12, 338);
+        ctx.fillRect(110, 548, 145, 12); ctx.fillRect(318, 548, 86, 12); ctx.fillRect(468, 548, 92, 12);
+        ctx.fillRect(322, 560, 12, 145); ctx.fillRect(548, 560, 12, 145);
+        ctx.fillRect(110, 696, 224, 12); ctx.fillRect(398, 696, 162, 12);
+        ctx.fillRect(366, 708, 12, 90); ctx.fillRect(674, 700, 12, 98);
+
+        ctx.strokeStyle = '#222';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(303, 118, 82, 6);
+        ctx.strokeRect(600, 118, 180, 6);
+        ctx.strokeRect(99, 555, 6, 95);
+        ctx.beginPath(); ctx.moveTo(916, 760); ctx.lineTo(836, 760); ctx.arc(916, 760, 80, Math.PI, Math.PI * 1.5); ctx.stroke();
+        ctx.strokeRect(600, 60, 272, 54);
+
+        const img = new Image();
+        img.onload = () => loadImageElement(img, '已載入範例平面圖');
+        img.src = c.toDataURL('image/png');
+      }
+
+      function morphErode(mask, w, h, r) {
+        const n = w * h, need = 2 * r + 1, tmp = new Uint8Array(n);
+        for (let y = 0; y < h; y++) {
+          const row = y * w;
+          let run = 0;
+          for (let x = 0; x < w; x++) {
+            run = mask[row + x] ? run + 1 : 0;
+            if (x >= r && run >= need) tmp[row + x - r] = 1;
+          }
+        }
+        const out = new Uint8Array(n);
+        for (let x = 0; x < w; x++) {
+          let run = 0;
+          for (let y = 0; y < h; y++) {
+            run = tmp[y * w + x] ? run + 1 : 0;
+            if (y >= r && run >= need) out[(y - r) * w + x] = 1;
+          }
+        }
+        return out;
+      }
+
+      function morphDilate(mask, w, h, r) {
+        const n = w * h, tmp = new Uint8Array(n);
+        for (let y = 0; y < h; y++) {
+          const row = y * w;
+          let last = -1e9;
+          for (let x = 0; x < w; x++) {
+            if (mask[row + x]) last = x;
+            if (x - last <= r) tmp[row + x] = 1;
+          }
+          last = 1e9;
+          for (let x = w - 1; x >= 0; x--) {
+            if (mask[row + x]) last = x;
+            if (last - x <= r) tmp[row + x] = 1;
+          }
+        }
+        const out = new Uint8Array(n);
+        for (let x = 0; x < w; x++) {
+          let last = -1e9;
+          for (let y = 0; y < h; y++) {
+            if (tmp[y * w + x]) last = y;
+            if (y - last <= r) out[y * w + x] = 1;
+          }
+          last = 1e9;
+          for (let y = h - 1; y >= 0; y--) {
+            if (tmp[y * w + x]) last = y;
+            if (last - y <= r) out[y * w + x] = 1;
+          }
+        }
+        return out;
+      }
+
+      function runAutoClean() {
+        if (!state.hasImage) return;
+        setBusy(true, '正在分析隔間牆、門窗外框與廚衛設備…');
+
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            try {
+              const t0 = performance.now();
+              const w = state.imgW, h = state.imgH, n = w * h;
+              const origData = origCtx.getImageData(0, 0, w, h);
+              const gray = buildNormalizedGray(origData, state.whiteBg);
+
+              const thresh = state.darkThresh;
+              const dark = new Uint8Array(n);
+              for (let i = 0; i < n; i++) if (gray[i] < thresh) dark[i] = 1;
+
+              const r = state.wallThick;
+              const eroded = morphErode(dark, w, h, r);
+              const opened = morphDilate(eroded, w, h, r);
+
+              const wallMask = new Uint8Array(opened);
+              const cornerThresh = Math.min(200, thresh + 40);
+              for (let y = 1; y < h - 1; y++) {
+                const row = y * w;
+                for (let x = 1; x < w - 1; x++) {
+                  const idx = row + x;
+                  if (!opened[idx] && gray[idx] < cornerThresh) {
+                    const cnt =
+                      opened[idx - 1] + opened[idx + 1] + opened[idx - w] + opened[idx + w] +
+                      opened[idx - w - 1] + opened[idx - w + 1] + opened[idx + w - 1] + opened[idx + w + 1];
+                    if (cnt >= 5) wallMask[idx] = 1;
+                  }
+                }
+              }
+
+              const minWallArea = Math.max(90, Math.round(n * 0.00022));
+              const visited = new Uint8Array(n);
+              const queue = new Int32Array(n);
+              const compBuf = new Int32Array(n);
+
+              for (let i = 0; i < n; i++) {
+                if (wallMask[i] && !visited[i]) {
+                  let qh = 0, qt = 0, clen = 0;
+                  queue[qt++] = i; visited[i] = 1;
+                  while (qh < qt) {
+                    const cur = queue[qh++];
+                    compBuf[clen++] = cur;
+                    const cx = cur % w, cy = (cur - cx) / w;
+                    if (cx > 0 && wallMask[cur - 1] && !visited[cur - 1]) { visited[cur - 1] = 1; queue[qt++] = cur - 1; }
+                    if (cx + 1 < w && wallMask[cur + 1] && !visited[cur + 1]) { visited[cur + 1] = 1; queue[qt++] = cur + 1; }
+                    if (cy > 0 && wallMask[cur - w] && !visited[cur - w]) { visited[cur - w] = 1; queue[qt++] = cur - w; }
+                    if (cy + 1 < h && wallMask[cur + w] && !visited[cur + w]) { visited[cur + w] = 1; queue[qt++] = cur + w; }
+                  }
+                  if (clen < minWallArea) {
+                    for (let k = 0; k < clen; k++) wallMask[compBuf[k]] = 0;
+                  }
+                }
+              }
+
+              const findClustersWithLines = (coords, maxInterGap = 16, maxBandSpan = 24) => {
+                if (coords.length === 0) return [];
+                const lines = [];
+                let start = coords[0], prev = coords[0];
+                for (let i = 1; i < coords.length; i++) {
+                  const c = coords[i];
+                  if (c <= prev + 1) prev = c;
+                  else { lines.push([start, prev]); start = prev = c; }
+                }
+                lines.push([start, prev]);
+
+                const clusters = [];
+                let cur = [lines[0]];
+                for (let i = 1; i < lines.length; i++) {
+                  const ln = lines[i];
+                  if (ln[0] - cur[cur.length - 1][1] <= maxInterGap && (ln[1] - cur[0][0]) <= maxBandSpan) {
+                    cur.push(ln);
+                  } else {
+                    if (cur.length >= 2) clusters.push([cur[0][0], cur[cur.length - 1][1], cur.slice()]);
+                    cur = [ln];
+                  }
+                }
+                if (cur.length >= 2) clusters.push([cur[0][0], cur[cur.length - 1][1], cur.slice()]);
+                return clusters;
+              };
+
+              let wetMask = null, winMask = null, extFrameMask = null, detectedZones = 0;
+
+              if (state.cleanMode === 'smart' || state.keepOpenings) {
+                const closedWalls = new Uint8Array(wallMask);
+                const detectedWinMask = new Uint8Array(n);
+                const maxWinGap = Math.round(Math.max(w, h) * 0.34);
+                const maxColBand = Math.round(Math.min(w, h) * 0.12);
+                const maxDoorGap = Math.round(Math.min(w, h) * 0.125);
+                const doorGaps = [];
+
+                const hGaps = new Map();
+                for (let y = 0; y < h; y++) {
+                  const row = y * w;
+                  let lastW = -1;
+                  for (let x = 0; x < w; x++) {
+                    if (wallMask[row + x]) {
+                      if (lastW !== -1) {
+                        const gapLen = x - lastW - 1;
+                        if (gapLen >= 14 && gapLen <= maxWinGap) {
+                          const key = ((lastW / 6) | 0) * 10000 + ((x / 6) | 0);
+                          let list = hGaps.get(key);
+                          if (!list) hGaps.set(key, [[lastW, x, y, y, 1]]);
+                          else {
+                            const g = list[list.length - 1];
+                            if (y - g[3] <= 4) {
+                              if (lastW < g[0]) g[0] = lastW;
+                              if (x > g[1]) g[1] = x;
+                              g[3] = y; g[4]++;
+                            } else list.push([lastW, x, y, y, 1]);
+                          }
+                        }
+                      }
+                      lastW = x;
+                    }
+                  }
+                }
+
+                for (const gapList of hGaps.values()) {
+                  for (const [x1, x2, y1, y2, rowsCnt] of gapList) {
+                    const gapLen = x2 - x1 - 1, bandH = y2 - y1 + 1;
+                    const isDoorBand = (gapLen <= maxDoorGap && bandH <= 28 && rowsCnt >= 3);
+                    if (isDoorBand) {
+                      for (let yy = y1; yy <= y2; yy++) {
+                        const row = yy * w;
+                        for (let xx = x1 + 1; xx < x2; xx++) closedWalls[row + xx] = 1;
+                      }
+                    }
+                    if (rowsCnt < 4 || gapLen < 16 || bandH > maxColBand) continue;
+                    const padY0 = Math.max(0, y1 - 6), padY1 = Math.min(h - 1, y2 + 6);
+                    const lineYs = [];
+                    for (let yy = padY0; yy <= padY1; yy++) {
+                      const row = yy * w;
+                      let darkInRow = 0;
+                      for (let xx = x1 + 2; xx < x2 - 1; xx++) if (gray[row + xx] < 210) darkInRow++;
+                      if (darkInRow >= gapLen * 0.78) lineYs.push(yy);
+                    }
+                    for (const [c0, c1, lines] of findClustersWithLines(lineYs)) {
+                      const cnt = lines.length;
+                      const nearEdge = (Math.abs(c0 - y1) <= 10 || Math.abs(c1 - y2) <= 10);
+                      if (cnt >= 3) {
+                        if (bandH > 30 && !nearEdge) continue;
+                        for (let yy = c0; yy <= c1; yy++) {
+                          const row = yy * w;
+                          for (let xx = x1; xx <= x2; xx++) { detectedWinMask[row + xx] = 1; closedWalls[row + xx] = 1; }
+                        }
+                      } else if (cnt === 2 && isDoorBand) {
+                        const span = c1 - c0;
+                        if (span >= 5 && span <= 20) {
+                          doorGaps.push(['H', x1, x2, c0, c1]);
+                          for (const [l0, l1] of lines) {
+                            for (let yy = l0; yy <= l1; yy++) {
+                              const row = yy * w;
+                              for (let xx = x1; xx <= x2; xx++) detectedWinMask[row + xx] = 1;
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+
+                const vGaps = new Map();
+                for (let x = 0; x < w; x++) {
+                  let lastW = -1;
+                  for (let y = 0; y < h; y++) {
+                    if (wallMask[y * w + x]) {
+                      if (lastW !== -1) {
+                        const gapLen = y - lastW - 1;
+                        if (gapLen >= 14 && gapLen <= maxWinGap) {
+                          const key = ((lastW / 6) | 0) * 10000 + ((y / 6) | 0);
+                          let list = vGaps.get(key);
+                          if (!list) vGaps.set(key, [[lastW, y, x, x, 1]]);
+                          else {
+                            const g = list[list.length - 1];
+                            if (x - g[3] <= 4) {
+                              if (lastW < g[0]) g[0] = lastW;
+                              if (y > g[1]) g[1] = y;
+                              g[3] = x; g[4]++;
+                            } else list.push([lastW, y, x, x, 1]);
+                          }
+                        }
+                      }
+                      lastW = y;
+                    }
+                  }
+                }
+
+                for (const gapList of vGaps.values()) {
+                  for (const [y1, y2, x1, x2, colsCnt] of gapList) {
+                    const gapLen = y2 - y1 - 1, bandW = x2 - x1 + 1;
+                    const isDoorBand = (gapLen <= maxDoorGap && bandW <= 28 && colsCnt >= 3);
+                    if (isDoorBand) {
+                      for (let yy = y1 + 1; yy < y2; yy++) {
+                        const row = yy * w;
+                        for (let xx = x1; xx <= x2; xx++) closedWalls[row + xx] = 1;
+                      }
+                    }
+                    if (colsCnt < 4 || gapLen < 16 || bandW > maxColBand) continue;
+                    const padX0 = Math.max(0, x1 - 6), padX1 = Math.min(w - 1, x2 + 6);
+                    const lineXs = [];
+                    for (let xx = padX0; xx <= padX1; xx++) {
+                      let darkInCol = 0;
+                      for (let yy = y1 + 2; yy < y2 - 1; yy++) if (gray[yy * w + xx] < 210) darkInCol++;
+                      if (darkInCol >= gapLen * 0.78) lineXs.push(xx);
+                    }
+                    for (const [c0, c1, lines] of findClustersWithLines(lineXs)) {
+                      const cnt = lines.length;
+                      const nearEdge = (Math.abs(c0 - x1) <= 10 || Math.abs(c1 - x2) <= 10);
+                      if (cnt >= 3) {
+                        if (bandW > 30 && !nearEdge) continue;
+                        for (let yy = y1; yy <= y2; yy++) {
+                          const row = yy * w;
+                          for (let xx = c0; xx <= c1; xx++) { detectedWinMask[row + xx] = 1; closedWalls[row + xx] = 1; }
+                        }
+                      } else if (cnt === 2 && isDoorBand) {
+                        const span = c1 - c0;
+                        if (span >= 5 && span <= 20) {
+                          doorGaps.push(['V', y1, y2, c0, c1]);
+                          for (const [l0, l1] of lines) {
+                            for (let yy = y1; yy <= y2; yy++) {
+                              const row = yy * w;
+                              for (let xx = l0; xx <= l1; xx++) detectedWinMask[row + xx] = 1;
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+
+                const extFromWalls = new Uint8Array(n);
+                let eqh = 0, eqt = 0;
+                for (let x = 0; x < w; x++) {
+                  if (!closedWalls[x]) { extFromWalls[x] = 1; queue[eqt++] = x; }
+                  const bi = (h - 1) * w + x;
+                  if (!closedWalls[bi] && !extFromWalls[bi]) { extFromWalls[bi] = 1; queue[eqt++] = bi; }
+                }
+                for (let y = 0; y < h; y++) {
+                  const li = y * w;
+                  if (!closedWalls[li] && !extFromWalls[li]) { extFromWalls[li] = 1; queue[eqt++] = li; }
+                  const ri = li + w - 1;
+                  if (!closedWalls[ri] && !extFromWalls[ri]) { extFromWalls[ri] = 1; queue[eqt++] = ri; }
+                }
+                while (eqh < eqt) {
+                  const cur = queue[eqh++];
+                  const cx = cur % w, cy = (cur - cx) / w;
+                  if (cx > 0 && !closedWalls[cur - 1] && !extFromWalls[cur - 1]) { extFromWalls[cur - 1] = 1; queue[eqt++] = cur - 1; }
+                  if (cx + 1 < w && !closedWalls[cur + 1] && !extFromWalls[cur + 1]) { extFromWalls[cur + 1] = 1; queue[eqt++] = cur + 1; }
+                  if (cy > 0 && !closedWalls[cur - w] && !extFromWalls[cur - w]) { extFromWalls[cur - w] = 1; queue[eqt++] = cur - w; }
+                  if (cy + 1 < h && !closedWalls[cur + w] && !extFromWalls[cur + w]) { extFromWalls[cur + w] = 1; queue[eqt++] = cur + w; }
+                }
+
+                for (const [orient, a1, a2, b1, b2] of doorGaps) {
+                  const gapLen = a2 - a1 - 1;
+                  if (gapLen < 65) continue;
+                  if (orient === 'V') {
+                    const midY = (a1 + a2) >> 1;
+                    const leftExt = (b1 >= 15 && extFromWalls[midY * w + (b1 - 12)] === 1);
+                    const rightExt = (b2 + 15 < w && extFromWalls[midY * w + (b2 + 12)] === 1);
+                    if (leftExt === rightExt) continue;
+                    const inDir = rightExt ? -1 : 1;
+                    const edgeX = rightExt ? b1 : b2;
+                    for (const hingeY of [a2, a1]) {
+                      const lx0 = Math.max(0, Math.min(edgeX, edgeX + inDir * gapLen));
+                      const lx1 = Math.min(w - 1, Math.max(edgeX, edgeX + inDir * gapLen));
+                      const leafYs = [];
+                      for (let yy = Math.max(0, hingeY - 12); yy <= Math.min(h - 1, hingeY + 12); yy++) {
+                        let dCnt = 0; const row = yy * w;
+                        for (let xx = lx0 + 4; xx < lx1 - 3; xx++) if (gray[row + xx] < 210) dCnt++;
+                        if (dCnt >= gapLen * 0.72) leafYs.push(yy);
+                      }
+                      if (leafYs.length > 0) {
+                        for (const yy of leafYs) {
+                          const row = yy * w;
+                          for (let xx = lx0; xx <= lx1; xx++) detectedWinMask[row + xx] = 1;
+                        }
+                        const arcCenterY = leafYs[0];
+                        const openEndY = (hingeY === a2) ? a1 : a2;
+                        const arcR = Math.abs(openEndY - arcCenterY);
+                        const cy0 = Math.max(0, Math.min(a1, a2) - 4), cy1 = Math.min(h - 1, Math.max(a1, a2) + 4);
+                        for (let yy = cy0; yy <= cy1; yy++) {
+                          const row = yy * w, dy = yy - arcCenterY;
+                          for (let xx = lx0; xx <= lx1; xx++) {
+                            if (gray[row + xx] >= 215 || wallMask[row + xx]) continue;
+                            if (Math.abs(Math.hypot(xx - edgeX, dy) - arcR) <= 8.5) {
+                              const isVPlank = (yy >= 7 && yy + 7 < h &&
+                                gray[(yy - 6) * w + xx] < 215 && gray[(yy + 6) * w + xx] < 215 &&
+                                gray[(yy - 3) * w + xx] < 215 && gray[(yy + 3) * w + xx] < 215);
+                              if (!isVPlank) detectedWinMask[row + xx] = 1;
+                            }
+                          }
+                        }
+                      }
+                    }
+                  } else {
+                    const midX = (a1 + a2) >> 1;
+                    const topExt = (b1 >= 15 && extFromWalls[(b1 - 12) * w + midX] === 1);
+                    const botExt = (b2 + 15 < h && extFromWalls[(b2 + 12) * w + midX] === 1);
+                    if (topExt === botExt) continue;
+                    const inDir = botExt ? -1 : 1;
+                    const edgeY = botExt ? b1 : b2;
+                    for (const hingeX of [a2, a1]) {
+                      const ly0 = Math.max(0, Math.min(edgeY, edgeY + inDir * gapLen));
+                      const ly1 = Math.min(h - 1, Math.max(edgeY, edgeY + inDir * gapLen));
+                      const leafXs = [];
+                      for (let xx = Math.max(0, hingeX - 12); xx <= Math.min(w - 1, hingeX + 12); xx++) {
+                        let dCnt = 0;
+                        for (let yy = ly0 + 4; yy < ly1 - 3; yy++) if (gray[yy * w + xx] < 210) dCnt++;
+                        if (dCnt >= gapLen * 0.72) leafXs.push(xx);
+                      }
+                      if (leafXs.length > 0) {
+                        for (const xx of leafXs) for (let yy = ly0; yy <= ly1; yy++) detectedWinMask[yy * w + xx] = 1;
+                        const arcCenterX = leafXs[0];
+                        const openEndX = (hingeX === a2) ? a1 : a2;
+                        const arcR = Math.abs(openEndX - arcCenterX);
+                        const cx0 = Math.max(0, Math.min(a1, a2) - 4), cx1 = Math.min(w - 1, Math.max(a1, a2) + 4);
+                        for (let yy = ly0; yy <= ly1; yy++) {
+                          const row = yy * w, dy = yy - edgeY;
+                          for (let xx = cx0; xx <= cx1; xx++) {
+                            if (gray[row + xx] >= 215 || wallMask[row + xx]) continue;
+                            if (Math.abs(Math.hypot(xx - arcCenterX, dy) - arcR) <= 8.5) {
+                              const isHPlank = (xx >= 7 && xx + 7 < w &&
+                                gray[row + xx - 6] < 215 && gray[row + xx + 6] < 215 &&
+                                gray[row + xx - 3] < 215 && gray[row + xx + 3] < 215);
+                              if (!isHPlank) detectedWinMask[row + xx] = 1;
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+
+                if (state.keepOpenings) {
+                  winMask = detectedWinMask;
+
+                  const trueAir = new Uint8Array(n);
+                  let aqh = 0, aqt = 0;
+                  for (let x = 0; x < w; x++) {
+                    if (gray[x] >= 210) { trueAir[x] = 1; queue[aqt++] = x; }
+                    const bi = (h - 1) * w + x;
+                    if (gray[bi] >= 210 && !trueAir[bi]) { trueAir[bi] = 1; queue[aqt++] = bi; }
+                  }
+                  for (let y = 0; y < h; y++) {
+                    const li = y * w;
+                    if (gray[li] >= 210 && !trueAir[li]) { trueAir[li] = 1; queue[aqt++] = li; }
+                    const ri = li + w - 1;
+                    if (gray[ri] >= 210 && !trueAir[ri]) { trueAir[ri] = 1; queue[aqt++] = ri; }
+                  }
+                  while (aqh < aqt) {
+                    const cur = queue[aqh++];
+                    const cx = cur % w, cy = (cur - cx) / w;
+                    if (cx > 0 && gray[cur - 1] >= 210 && !trueAir[cur - 1]) { trueAir[cur - 1] = 1; queue[aqt++] = cur - 1; }
+                    if (cx + 1 < w && gray[cur + 1] >= 210 && !trueAir[cur + 1]) { trueAir[cur + 1] = 1; queue[aqt++] = cur + 1; }
+                    if (cy > 0 && gray[cur - w] >= 210 && !trueAir[cur - w]) { trueAir[cur - w] = 1; queue[aqt++] = cur - w; }
+                    if (cy + 1 < h && gray[cur + w] >= 210 && !trueAir[cur + w]) { trueAir[cur + w] = 1; queue[aqt++] = cur + w; }
+                  }
+
+                  extFrameMask = new Uint8Array(n);
+                  const pockVis = new Uint8Array(n);
+                  const keptExtBoxes = [];
+
+                  for (let i = 0; i < n; i++) {
+                    if (extFromWalls[i] && !trueAir[i] && gray[i] >= 205 && !pockVis[i]) {
+                      let qh = 0, qt = 0, clen = 0;
+                      let minx = w, miny = h, maxx = 0, maxy = 0;
+                      queue[qt++] = i; pockVis[i] = 1;
+                      while (qh < qt) {
+                        const cur = queue[qh++]; clen++;
+                        const cx = cur % w, cy = (cur - cx) / w;
+                        if (cx < minx) minx = cx; if (cx > maxx) maxx = cx;
+                        if (cy < miny) miny = cy; if (cy > maxy) maxy = cy;
+                        if (cx > 0 && extFromWalls[cur - 1] && !trueAir[cur - 1] && gray[cur - 1] >= 205 && !pockVis[cur - 1]) { pockVis[cur - 1] = 1; queue[qt++] = cur - 1; }
+                        if (cx + 1 < w && extFromWalls[cur + 1] && !trueAir[cur + 1] && gray[cur + 1] >= 205 && !pockVis[cur + 1]) { pockVis[cur + 1] = 1; queue[qt++] = cur + 1; }
+                        if (cy > 0 && extFromWalls[cur - w] && !trueAir[cur - w] && gray[cur - w] >= 205 && !pockVis[cur - w]) { pockVis[cur - w] = 1; queue[qt++] = cur - w; }
+                        if (cy + 1 < h && extFromWalls[cur + w] && !trueAir[cur + w] && gray[cur + w] >= 205 && !pockVis[cur + w]) { pockVis[cur + w] = 1; queue[qt++] = cur + w; }
+                      }
+                      const rw = maxx - minx + 1, rh = maxy - miny + 1;
+                      const fillRatio = clen / Math.max(1, rw * rh);
+                      const pct = (clen / n) * 100;
+                      if (pct >= 0.30 && fillRatio > 0.45) {
+                        let cornersIn = 0;
+                        const cPts = [[minx + 5, miny + 5], [maxx - 5, miny + 5], [minx + 5, maxy - 5], [maxx - 5, maxy - 5]];
+                        for (const [kx, ky] of cPts) {
+                          if (kx >= 0 && kx < w && ky >= 0 && ky < h) {
+                            const ki = ky * w + kx;
+                            if (pockVis[ki] && extFromWalls[ki] && !trueAir[ki]) cornersIn++;
+                          }
+                        }
+                        if (cornersIn >= 3) {
+                          keptExtBoxes.push([minx, miny, maxx, maxy]);
+                          const y0 = Math.max(0, miny - 3), y1 = Math.min(h - 1, maxy + 3);
+                          const x0 = Math.max(0, minx - 3), x1 = Math.min(w - 1, maxx + 3);
+                          for (let yy = y0; yy <= y1; yy++) {
+                            const row = yy * w;
+                            for (let xx = x0; xx <= x1; xx++) {
+                              const idx = row + xx;
+                              if (!wallMask[idx] && extFromWalls[idx]) {
+                                if (yy <= miny + 2 || yy >= maxy - 2 || xx <= minx + 2 || xx >= maxx - 2) extFrameMask[idx] = 1;
+                              }
+                            }
+                          }
+                          const py0 = Math.max(0, miny - 58), py1 = Math.min(h - 1, maxy + 58);
+                          for (let yy = py0; yy <= py1; yy++) {
+                            if (yy >= miny && yy <= maxy) continue;
+                            const row = yy * w;
+                            let dRun = 0;
+                            for (let xx = minx; xx <= maxx; xx++) if (gray[row + xx] < 210 && extFromWalls[row + xx]) dRun++;
+                            if (dRun >= rw * 0.65) {
+                              for (let xx = Math.max(0, minx - 4); xx <= Math.min(w - 1, maxx + 4); xx++) {
+                                if (extFromWalls[row + xx]) extFrameMask[row + xx] = 1;
+                              }
+                            }
+                          }
+                          if (miny >= 10) {
+                            let louverTicks = 0;
+                            const lRow = (miny - 5) * w;
+                            for (let xx = minx + 4; xx <= maxx - 4; xx++) {
+                              if (gray[lRow + xx] < 210 && extFromWalls[lRow + xx]) louverTicks++;
+                            }
+                            if (louverTicks >= rw * 0.20) {
+                              for (let yy = Math.max(0, miny - 12); yy <= miny + 1; yy++) {
+                                const row = yy * w;
+                                for (let xx = Math.max(0, minx - 3); xx <= Math.min(w - 1, maxx + 3); xx++) {
+                                  if (extFromWalls[row + xx]) extFrameMask[row + xx] = 1;
+                                }
+                              }
+                            }
+                          }
+                          const px0 = Math.max(0, minx - 36), px1 = Math.min(w - 1, maxx + 36);
+                          for (let xx = px0; xx <= px1; xx++) {
+                            if (xx >= minx && xx <= maxx) continue;
+                            let dRun = 0;
+                            for (let yy = miny; yy <= maxy; yy++) if (gray[yy * w + xx] < 210 && extFromWalls[yy * w + xx]) dRun++;
+                            if (dRun >= rh * 0.65) {
+                              for (let yy = Math.max(0, miny - 4); yy <= Math.min(h - 1, maxy + 4); yy++) {
+                                if (extFromWalls[yy * w + xx]) extFrameMask[yy * w + xx] = 1;
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+
+                  for (let a = 0; a < keptExtBoxes.length; a++) {
+                    const [ax0, ay0, ax1, ay1] = keptExtBoxes[a];
+                    for (let b = a + 1; b < keptExtBoxes.length; b++) {
+                      const [bx0, by0, bx1, by1] = keptExtBoxes[b];
+                      if (Math.abs(bx0 - ax1) <= 28 || Math.abs(ax0 - bx1) <= 28) {
+                        const gx0 = Math.max(0, Math.min(ax1, bx1) - 2);
+                        const gx1 = Math.min(w - 1, Math.max(ax0, bx0) + 2);
+                        const gy0 = Math.max(0, Math.min(ay0, by0) - 4);
+                        const gy1 = Math.min(h - 1, Math.max(ay1, by1) + 4);
+                        if (gx1 - gx0 <= 32) {
+                          for (let yy = gy0; yy <= gy1; yy++) {
+                            const row = yy * w;
+                            for (let xx = gx0; xx <= gx1; xx++) if (extFromWalls[row + xx]) extFrameMask[row + xx] = 1;
+                          }
+                        }
+                      }
+                    }
+                  }
+                  extFrameMask = morphDilate(extFrameMask, w, h, 1);
+                }
+
+                if (state.cleanMode === 'smart') {
+                  wetMask = new Uint8Array(n);
+                  const roomVis = new Uint8Array(n);
+                  const keptRooms = [];
+
+                  for (let i = 0; i < n; i++) {
+                    if (!closedWalls[i] && !extFromWalls[i] && !roomVis[i]) {
+                      let qh = 0, qt = 0, clen = 0;
+                      let minx = w, miny = h, maxx = 0, maxy = 0, darkCnt = 0;
+
+                      queue[qt++] = i; roomVis[i] = 1;
+                      while (qh < qt) {
+                        const cur = queue[qh++];
+                        compBuf[clen++] = cur;
+                        const cx = cur % w, cy = (cur - cx) / w;
+                        if (cx < minx) minx = cx; if (cx > maxx) maxx = cx;
+                        if (cy < miny) miny = cy; if (cy > maxy) maxy = cy;
+                        if (gray[cur] < 185) darkCnt++;
+
+                        if (cx > 0 && !closedWalls[cur - 1] && !extFromWalls[cur - 1] && !roomVis[cur - 1]) { roomVis[cur - 1] = 1; queue[qt++] = cur - 1; }
+                        if (cx + 1 < w && !closedWalls[cur + 1] && !extFromWalls[cur + 1] && !roomVis[cur + 1]) { roomVis[cur + 1] = 1; queue[qt++] = cur + 1; }
+                        if (cy > 0 && !closedWalls[cur - w] && !extFromWalls[cur - w] && !roomVis[cur - w]) { roomVis[cur - w] = 1; queue[qt++] = cur - w; }
+                        if (cy + 1 < h && !closedWalls[cur + w] && !extFromWalls[cur + w] && !roomVis[cur + w]) { roomVis[cur + w] = 1; queue[qt++] = cur + w; }
+                      }
+
+                      const pct = (clen / n) * 100;
+                      if (pct < 0.25 || pct > 5.6) continue;
+                      const rw = maxx - minx + 1, rh = maxy - miny + 1;
+                      if (Math.max(rw, rh) / Math.max(1, Math.min(rw, rh)) > 2.65) continue;
+                      if (darkCnt / clen < 0.015) continue;
+
+                      let dminx = maxx, dminy = maxy, dmaxx = minx, dmaxy = miny;
+                      for (let k = 0; k < clen; k++) {
+                        const idx = compBuf[k];
+                        if (gray[idx] < 190) {
+                          const cx = idx % w, cy = (idx - cx) / w;
+                          if (cx < dminx) dminx = cx; if (cx > dmaxx) dmaxx = cx;
+                          if (cy < dminy) dminy = cy; if (cy > dmaxy) dmaxy = cy;
+                        }
+                      }
+                      const dw = Math.max(1, dmaxx - dminx), dh = Math.max(1, dmaxy - dminy);
+                      let innerDark = 0, diagDark = 0;
+                      for (let k = 0; k < clen; k++) {
+                        const idx = compBuf[k];
+                        if (gray[idx] < 190) {
+                          const cx = idx % w, cy = (idx - cx) / w;
+                          if (cx <= dminx + 4 || cx >= dmaxx - 4 || cy <= dminy + 4 || cy >= dmaxy - 4) continue;
+                          innerDark++;
+                          const u = (cx - dminx) / dw, v = (cy - dminy) / dh;
+                          if (Math.abs(u - v) < 0.08 || Math.abs(u + v - 1) < 0.08) diagDark++;
+                        }
+                      }
+                      if (innerDark > 20 && (diagDark / innerDark) > 0.52) continue;
+
+                      let realWallTouch = 0, totalBoundary = 0;
+                      for (let k = 0; k < clen; k++) {
+                        const idx = compBuf[k];
+                        const cx = idx % w, cy = (idx - cx) / w;
+                        if (cx > 0 && closedWalls[idx - 1]) { totalBoundary++; if (wallMask[idx - 1] || detectedWinMask[idx - 1]) realWallTouch++; }
+                        if (cx + 1 < w && closedWalls[idx + 1]) { totalBoundary++; if (wallMask[idx + 1] || detectedWinMask[idx + 1]) realWallTouch++; }
+                        if (cy > 0 && closedWalls[idx - w]) { totalBoundary++; if (wallMask[idx - w] || detectedWinMask[idx - w]) realWallTouch++; }
+                        if (cy + 1 < h && closedWalls[idx + w]) { totalBoundary++; if (wallMask[idx + w] || detectedWinMask[idx + w]) realWallTouch++; }
+                      }
+                      if ((realWallTouch / Math.max(1, totalBoundary)) < 0.54) continue;
+
+                      let longV = 0;
+                      for (let x = minx + 3; x < maxx - 3; x += 2) {
+                        let run = 0, maxRun = 0;
+                        for (let y = miny + 2; y < maxy - 2; y++) {
+                          if (gray[y * w + x] < 225) { run++; if (run > maxRun) maxRun = run; } else run = 0;
+                        }
+                        if (maxRun > rh * 0.65) longV++;
+                      }
+                      if (longV >= 3 && (longV / Math.max(1, rw / 2)) > 0.06) continue;
+
+                      let curvePx = 0, straightPx = 0;
+                      for (let k = 0; k < clen; k++) {
+                        const idx = compBuf[k];
+                        if (gray[idx] < 185) {
+                          const cx = idx % w, cy = (idx - cx) / w;
+                          if (cx <= minx + 3 || cx >= maxx - 3 || cy <= miny + 3 || cy >= maxy - 3) continue;
+                          const hn = (gray[idx - 1] < 185 ? 1 : 0) + (gray[idx + 1] < 185 ? 1 : 0);
+                          const vn = (gray[idx - w] < 185 ? 1 : 0) + (gray[idx + w] < 185 ? 1 : 0);
+                          if ((hn === 2 && vn === 0) || (vn === 2 && hn === 0)) straightPx++;
+                          else curvePx++;
+                        }
+                      }
+                      const curveRatio = curvePx / Math.max(1, curvePx + straightPx);
+                      if (curveRatio < 0.44 || (curvePx < 650 && curveRatio < 0.48)) continue;
+
+                      detectedZones++;
+                      keptRooms.push([minx, miny, maxx, maxy]);
+                      for (let k = 0; k < clen; k++) wetMask[compBuf[k]] = 1;
+                    }
+                  }
+
+                  if (detectedZones > 0) {
+                    wetMask = morphDilate(wetMask, w, h, 3);
+
+                    const fixDark = new Uint8Array(n);
+                    for (let i = 0; i < n; i++) {
+                      if (wetMask[i] && !wallMask[i] && !(winMask && winMask[i]) && gray[i] < 195) fixDark[i] = 1;
+                    }
+
+                    const pickSpacedLines = (cands, minGap = 8) => {
+                      if (cands.length < 2) return [];
+                      const spaced = [cands[0]];
+                      for (let i = 1; i < cands.length; i++) {
+                        if (cands[i][0] - spaced[spaced.length - 1][1] >= minGap) spaced.push(cands[i]);
+                      }
+                      return spaced.length >= 2 ? spaced : [];
+                    };
+
+                    for (const [minx, miny, maxx, maxy] of keptRooms) {
+                      const rw = maxx - minx + 1, rh = maxy - miny + 1;
+
+                      let protectedCounterY = -1;
+                      for (let cy = maxy - 30; cy >= Math.max(miny + 20, maxy - 88); cy--) {
+                        const crow = cy * w;
+                        let dCnt = 0;
+                        for (let x = minx + 2; x < maxx - 1; x++) if (fixDark[crow + x]) dCnt++;
+                        if (dCnt >= rw * 0.50) {
+                          let bandTot = 0, bandDark = 0;
+                          for (let by = cy + 5; by < maxy - 4; by++) {
+                            const brow = by * w;
+                            for (let x = minx + 5; x < maxx - 4; x++) { bandTot++; if (fixDark[brow + x]) bandDark++; }
+                          }
+                          if (bandDark / Math.max(1, bandTot) > 0.11) { protectedCounterY = cy; break; }
+                        }
+                      }
+
+                      let hasKitchenCounter = (protectedCounterY !== -1);
+                      if (!hasKitchenCounter) {
+                        for (let cy = miny + 30; cy <= Math.min(maxy - 20, miny + 88); cy++) {
+                          const crow = cy * w;
+                          let dCnt = 0;
+                          for (let x = minx + 2; x < maxx - 1; x++) if (fixDark[crow + x]) dCnt++;
+                          if (dCnt >= rw * 0.50) {
+                            let bandTot = 0, bandDark = 0;
+                            for (let by = miny + 5; by < cy - 4; by++) {
+                              const brow = by * w;
+                              for (let x = minx + 5; x < maxx - 4; x++) { bandTot++; if (fixDark[brow + x]) bandDark++; }
+                            }
+                            if (bandDark / Math.max(1, bandTot) > 0.11) { hasKitchenCounter = true; break; }
+                          }
+                        }
+                      }
+                      if (!hasKitchenCounter) {
+                        for (let cx = maxx - 30; cx >= Math.max(minx + 20, maxx - 88); cx--) {
+                          let dCnt = 0;
+                          for (let y = miny + 2; y < maxy - 1; y++) if (fixDark[y * w + cx]) dCnt++;
+                          if (dCnt >= rh * 0.50) {
+                            let bandTot = 0, bandDark = 0;
+                            for (let y = miny + 5; y < maxy - 4; y++) {
+                              const row = y * w;
+                              for (let bx = cx + 5; bx < maxx - 4; bx++) { bandTot++; if (fixDark[row + bx]) bandDark++; }
+                            }
+                            if (bandDark / Math.max(1, bandTot) > 0.11) { hasKitchenCounter = true; break; }
+                          }
+                        }
+                      }
+                      if (!hasKitchenCounter) {
+                        for (let cx = minx + 30; cx <= Math.min(maxx - 20, minx + 88); cx++) {
+                          let dCnt = 0;
+                          for (let y = miny + 2; y < maxy - 1; y++) if (fixDark[y * w + cx]) dCnt++;
+                          if (dCnt >= rh * 0.50) {
+                            let bandTot = 0, bandDark = 0;
+                            for (let y = miny + 5; y < maxy - 4; y++) {
+                              const row = y * w;
+                              for (let bx = minx + 5; bx < cx - 4; bx++) { bandTot++; if (fixDark[row + bx]) bandDark++; }
+                            }
+                            if (bandDark / Math.max(1, bandTot) > 0.11) { hasKitchenCounter = true; break; }
+                          }
+                        }
+                      }
+
+                      if (!hasKitchenCounter) {
+                        detectedZones = Math.max(0, detectedZones - 1);
+                        const cy0 = Math.max(0, miny - 3), cy1 = Math.min(h - 1, maxy + 3);
+                        const cx0 = Math.max(0, minx - 3), cx1 = Math.min(w - 1, maxx + 3);
+                        for (let ey = cy0; ey <= cy1; ey++) {
+                          const erow = ey * w;
+                          for (let ex = cx0; ex <= cx1; ex++) wetMask[erow + ex] = 0;
+                        }
+                        continue;
+                      }
+
+                      const yLimit = (protectedCounterY !== -1) ? (protectedCounterY - 4) : (maxy - 2);
+                      const hCands = [];
+                      for (let y = miny + 2; y < yLimit; ) {
+                        const row = y * w;
+                        let dCnt = 0;
+                        for (let x = minx + 2; x < maxx - 1; x++) if (fixDark[row + x]) dCnt++;
+                        if (dCnt >= rw * 0.55) {
+                          let yEnd = y;
+                          while (yEnd + 1 < yLimit) {
+                            let nc = 0;
+                            const nrow = (yEnd + 1) * w;
+                            for (let x = minx + 2; x < maxx - 1; x++) if (fixDark[nrow + x]) nc++;
+                            if (nc >= rw * 0.40) yEnd++; else break;
+                          }
+                          if (yEnd - y + 1 <= 4) {
+                            let aboveD = 0, aboveT = 0, belowD = 0, belowT = 0;
+                            const ay0 = Math.max(miny + 1, y - 8), ay1 = Math.max(miny + 1, y - 2);
+                            for (let ay = ay0; ay < ay1; ay++) {
+                              const arow = ay * w;
+                              for (let x = minx + 5; x < maxx - 4; x++) { aboveT++; if (fixDark[arow + x]) aboveD++; }
+                            }
+                            const by0 = Math.min(yLimit, yEnd + 3), by1 = Math.min(yLimit, yEnd + 9);
+                            for (let by = by0; by < by1; by++) {
+                              const brow = by * w;
+                              for (let x = minx + 5; x < maxx - 4; x++) { belowT++; if (fixDark[brow + x]) belowD++; }
+                            }
+                            const ar = aboveD / Math.max(1, aboveT), br = belowD / Math.max(1, belowT);
+                            if ((ar < 0.04 && br < 0.14) || (br < 0.04 && ar < 0.14)) hCands.push([y, yEnd, ar, br]);
+                          }
+                          y = yEnd + 1;
+                        } else y++;
+                      }
+
+                      const erasedH = pickSpacedLines(hCands, 8);
+                      for (const [y0, y1, ar, br] of erasedH) {
+                        if (ar > 0.06 && br > 0.06) continue;
+                        const ey0 = Math.max(miny, y0 - 1), ey1 = Math.min(yLimit, y1 + 1);
+                        for (let ey = ey0; ey <= ey1; ey++) {
+                          const erow = ey * w;
+                          for (let x = minx; x <= maxx; x++) {
+                            if (!wallMask[erow + x] && !(winMask && winMask[erow + x])) wetMask[erow + x] = 0;
+                          }
+                        }
+                      }
+
+                      if (erasedH.length > 0) {
+                        const firstY = erasedH[0][0];
+                        for (let ey = miny; ey < firstY; ey++) {
+                          const erow = ey * w;
+                          for (let x = minx; x <= maxx; x++) {
+                            if (!wallMask[erow + x] && !(winMask && winMask[erow + x])) wetMask[erow + x] = 0;
+                          }
+                        }
+                      }
+
+                      if (protectedCounterY !== -1) {
+                        const counterY = protectedCounterY;
+                        const counterH = maxy - counterY;
+                        const divXs = [minx];
+                        for (let cx = minx + 15; cx < maxx - 10; cx++) {
+                          let vCnt = 0;
+                          for (let cy = counterY; cy < maxy; cy++) if (fixDark[cy * w + cx]) vCnt++;
+                          if (vCnt >= counterH * 0.62 && cx - divXs[divXs.length - 1] > 10) divXs.push(cx);
+                        }
+                        if (maxx - divXs[divXs.length - 1] > 10) divXs.push(maxx);
+
+                        for (const segI of [0, divXs.length - 2]) {
+                          if (segI < 0 || segI + 1 >= divXs.length) continue;
+                          const sx0 = divXs[segI], sx1 = divXs[segI + 1], sw = sx1 - sx0;
+                          if (sw < 36 || sw > 125) continue;
+                          let itot = 0, idark = 0;
+                          for (let cy = counterY + 8; cy < maxy - 6; cy++) {
+                            const crow = cy * w;
+                            for (let cx = sx0 + 8; cx < sx1 - 8; cx++) { itot++; if (fixDark[crow + cx]) idark++; }
+                          }
+                          if ((idark / Math.max(1, itot)) < 0.06) {
+                            let ex0, ex1;
+                            if (segI > 0) {
+                              const hasGap = (segI >= 2 && (sx0 - divXs[segI - 1]) <= 18);
+                              ex0 = hasGap ? sx0 - 1 : sx0 + 2; ex1 = sx1;
+                            } else {
+                              const hasGap = (divXs.length >= 3 && (divXs[2] - sx1) <= 18);
+                              ex0 = sx0; ex1 = hasGap ? sx1 + 1 : sx1 - 2;
+                            }
+                            for (let cy = Math.max(miny, counterY - 10); cy <= maxy; cy++) {
+                              const crow = cy * w;
+                              for (let cx = ex0; cx <= ex1; cx++) {
+                                if (!wallMask[crow + cx] && !(winMask && winMask[crow + cx])) wetMask[crow + cx] = 0;
+                              }
+                            }
+                          }
+                        }
+                      }
+
+                      const vCands = [];
+                      for (let x = minx + 2; x < maxx - 2; ) {
+                        let dCnt = 0;
+                        for (let y = miny + 2; y < maxy - 1; y++) if (fixDark[y * w + x]) dCnt++;
+                        if (dCnt >= rh * 0.55) {
+                          let xEnd = x;
+                          while (xEnd + 1 < maxx - 1) {
+                            let nc = 0;
+                            for (let y = miny + 2; y < maxy - 1; y++) if (fixDark[y * w + xEnd + 1]) nc++;
+                            if (nc >= rh * 0.40) xEnd++; else break;
+                          }
+                          if (xEnd - x + 1 <= 4) {
+                            let leftD = 0, leftT = 0, rightD = 0, rightT = 0;
+                            const ax0 = Math.max(minx + 1, x - 8), ax1 = Math.max(minx + 1, x - 2);
+                            for (let ax = ax0; ax < ax1; ax++) {
+                              for (let y = miny + 5; y < maxy - 4; y++) { leftT++; if (fixDark[y * w + ax]) leftD++; }
+                            }
+                            const bx0 = Math.min(maxx - 1, xEnd + 3), bx1 = Math.min(maxx - 1, xEnd + 9);
+                            for (let bx = bx0; bx < bx1; bx++) {
+                              for (let y = miny + 5; y < maxy - 4; y++) { rightT++; if (fixDark[y * w + bx]) rightD++; }
+                            }
+                            const lr = leftD / Math.max(1, leftT), rr = rightD / Math.max(1, rightT);
+                            if ((lr < 0.04 && rr < 0.14) || (rr < 0.04 && lr < 0.14)) vCands.push([x, xEnd, lr, rr]);
+                          }
+                          x = xEnd + 1;
+                        } else x++;
+                      }
+
+                      for (const [x0, x1, lr, rr] of pickSpacedLines(vCands, 8)) {
+                        if (lr > 0.06 && rr > 0.06) continue;
+                        const ex0 = Math.max(minx, x0 - 1), ex1 = Math.min(maxx, x1 + 1);
+                        for (let ex = ex0; ex <= ex1; ex++) {
+                          for (let y = miny; y <= maxy; y++) {
+                            const idx = y * w + ex;
+                            if (!wallMask[idx] && !(winMask && winMask[idx])) wetMask[idx] = 0;
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+
+              const outImg = workCtx.createImageData(w, h);
+              const od = outImg.data;
+              for (let i = 0, p = 0; i < n; i++, p += 4) {
+                let val = 255;
+                if (wallMask[i]) val = 0;
+                else if ((wetMask && wetMask[i]) || (winMask && winMask[i]) || (extFrameMask && extFrameMask[i])) {
+                  const g = gray[i];
+                  if (g < 195) val = g < 138 ? 0 : Math.min(255, Math.round((g - 138) * 4.2));
+                }
+                od[p] = od[p + 1] = od[p + 2] = val;
+                od[p + 3] = 255;
+              }
+              workCtx.putImageData(outImg, 0, 0);
+              rebuildUnderlayAndCleanRef();
+              pushHistory();
+
+              const elapsed = Math.round(performance.now() - t0);
+              const msg = state.cleanMode === 'smart'
+                ? `一鍵清圖完成（${elapsed}ms）！已保留隔間牆、門窗陽台與 ${detectedZones} 處廚衛設備區`
+                : `極淨純牆清圖完成（${elapsed}ms）！可用「框選還原」拉回廁所設備`;
+              showToast(msg, 3400);
+            } catch (err) {
+              console.error(err);
+              showToast('清圖過程發生錯誤，請再試一次');
+            } finally {
+              setBusy(false);
+            }
+          }, 25);
+        });
+      }
+
+      function rotateFloorPlan(dir) {
+        if (!state.hasImage) return;
+        const oldW = state.imgW, oldH = state.imgH;
+        const newW = oldH, newH = oldW;
+
+        const rotCopy = (srcCanvas) => {
+          const tmp = document.createElement('canvas');
+          tmp.width = newW; tmp.height = newH;
+          const tctx = tmp.getContext('2d');
+          tctx.fillStyle = '#ffffff';
+          tctx.fillRect(0, 0, newW, newH);
+          tctx.translate(newW / 2, newH / 2);
+          tctx.rotate((dir * Math.PI) / 2);
+          tctx.drawImage(srcCanvas, -oldW / 2, -oldH / 2);
+          return tmp;
+        };
+
+        const newWork = rotCopy(workCanvas);
+        const newOrig = rotCopy(origCanvas);
+
+        state.labels.forEach((lbl) => {
+          const ox = lbl.x, oy = lbl.y;
+          if (dir === 1) { lbl.x = oldH - oy; lbl.y = ox; }
+          else { lbl.x = oy; lbl.y = oldW - ox; }
+        });
+
+        resizeCanvases(newW, newH);
+        workCtx.drawImage(newWork, 0, 0);
+        origCtx.drawImage(newOrig, 0, 0);
+        rebuildUnderlayAndCleanRef();
+        renderLabels();
+        fitToViewport();
+        pushHistory();
+        showToast(dir === 1 ? '已順時針旋轉 90°' : '已逆時針旋轉 90°', 1500);
+      }
+
+      function selectTool(tool) {
+        state.tool = tool;
+        document.querySelectorAll('#toolGrid .tool-btn').forEach((btn) => {
+          btn.classList.toggle('active', btn.dataset.tool === tool);
+        });
+
+        const info = TOOL_INFO[tool];
+        $('toolOptTitle').textContent = info.title;
+        $('toolOptDesc').textContent = info.desc;
+        hudToolText.textContent = `目前工具：${info.title}`;
+
+        $('optBrushWrap').style.display = (tool === 'brushErase' || tool === 'brushRestore' || tool === 'blackPen') ? 'flex' : 'none';
+        $('optLineWrap').style.display = (tool === 'wallLine') ? 'flex' : 'none';
+        $('optRestoreWrap').style.display = (tool === 'boxRestore' || tool === 'brushRestore') ? 'flex' : 'none';
+
+        labelsLayer.style.pointerEvents = (tool === 'select') ? 'auto' : 'none';
+
+        if (tool === 'select') viewport.style.cursor = 'default';
+        else if (tool === 'magicErase') viewport.style.cursor = 'cell';
+        else viewport.style.cursor = 'crosshair';
+
+        clearPreview();
+      }
+
+      function clearPreview() { previewCtx.clearRect(0, 0, state.imgW, state.imgH); }
+
+      function drawBrushSegment(x0, y0, x1, y1, tool) {
+        const radius = state.brushSize / 2;
+        if (tool === 'brushErase' || tool === 'blackPen') {
+          const col = tool === 'brushErase' ? '#ffffff' : '#000000';
+          workCtx.save();
+          workCtx.strokeStyle = col; workCtx.fillStyle = col;
+          workCtx.lineWidth = state.brushSize;
+          workCtx.lineCap = 'round'; workCtx.lineJoin = 'round';
+          workCtx.beginPath(); workCtx.moveTo(x0, y0); workCtx.lineTo(x1, y1); workCtx.stroke();
+          workCtx.beginPath(); workCtx.arc(x1, y1, radius, 0, Math.PI * 2); workCtx.fill();
+          workCtx.restore();
+        } else if (tool === 'brushRestore') {
+          const dist = Math.hypot(x1 - x0, y1 - y0);
+          const steps = Math.max(1, Math.ceil(dist / Math.max(2, radius * 0.35)));
+          workCtx.save();
+          for (let s = 0; s <= steps; s++) {
+            const t = s / steps;
+            const cx = x0 + (x1 - x0) * t, cy = y0 + (y1 - y0) * t;
+            workCtx.save();
+            workCtx.beginPath(); workCtx.arc(cx, cy, radius, 0, Math.PI * 2); workCtx.clip();
+            workCtx.drawImage(cleanRefCanvas, 0, 0);
+            workCtx.restore();
+          }
+          workCtx.restore();
+        }
+      }
+
+      function computeSnappedEnd(start, end, shiftKey) {
+        if (!state.orthoSnap || shiftKey) return end;
+        return Math.abs(end.x - start.x) >= Math.abs(end.y - start.y)
+          ? { x: end.x, y: start.y }
+          : { x: start.x, y: end.y };
+      }
+
+      function applyBoxTool(start, end, tool) {
+        const x = Math.round(Math.min(start.x, end.x));
+        const y = Math.round(Math.min(start.y, end.y));
+        const w = Math.round(Math.abs(end.x - start.x));
+        const h = Math.round(Math.abs(end.y - start.y));
+        if (w < 2 || h < 2) return false;
+        if (tool === 'boxErase') {
+          workCtx.fillStyle = '#ffffff';
+          workCtx.fillRect(x, y, w, h);
+        } else if (tool === 'boxRestore') {
+          workCtx.drawImage(cleanRefCanvas, x, y, w, h, x, y, w, h);
+        }
+        return true;
+      }
+
+      function applyMagicErase(ix, iy) {
+        const w = state.imgW, h = state.imgH, n = w * h;
+        const sx = Math.round(ix), sy = Math.round(iy);
+        if (sx < 0 || sy < 0 || sx >= w || sy >= h) return;
+
+        const imgData = workCtx.getImageData(0, 0, w, h);
+        const d = imgData.data;
+
+        let seedX = -1, seedY = -1, bestDist = 999;
+        for (let dy = -5; dy <= 5; dy++) {
+          for (let dx = -5; dx <= 5; dx++) {
+            const nx = sx + dx, ny = sy + dy;
+            if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+            if (d[(ny * w + nx) * 4] < 215) {
+              const dist = dx * dx + dy * dy;
+              if (dist < bestDist) { bestDist = dist; seedX = nx; seedY = ny; }
+            }
+          }
+        }
+        if (seedX === -1) { showToast('請點擊深色線條或標記物件上', 1400); return; }
+
+        const visited = new Uint8Array(n);
+        const queue = new Int32Array(n);
+        const comp = new Int32Array(n);
+        let qh = 0, qt = 0, clen = 0;
+        const seedIdx = seedY * w + seedX;
+        queue[qt++] = seedIdx; visited[seedIdx] = 1;
+
+        const maxSafePixels = Math.round(n * 0.018);
+
+        while (qh < qt) {
+          const cur = queue[qh++];
+          comp[clen++] = cur;
+          if (clen > maxSafePixels) {
+            showToast('此線條與主隔間牆相連，已保護！請改用「框選清除」或「白色橡皮擦」', 2600);
+            return;
+          }
+          const cx = cur % w, cy = (cur - cx) / w;
+          for (let dy = -1; dy <= 1; dy++) {
+            const ny = cy + dy;
+            if (ny < 0 || ny >= h) continue;
+            for (let dx = -1; dx <= 1; dx++) {
+              if (dx === 0 && dy === 0) continue;
+              const nx = cx + dx;
+              if (nx < 0 || nx >= w) continue;
+              const ni = ny * w + nx;
+              if (!visited[ni] && d[ni * 4] < 225) { visited[ni] = 1; queue[qt++] = ni; }
+            }
+          }
+        }
+
+        for (let k = 0; k < clen; k++) {
+          const p = comp[k] * 4;
+          d[p] = d[p + 1] = d[p + 2] = 255;
+        }
+        workCtx.putImageData(imgData, 0, 0);
+        pushHistory();
+      }
+
+      viewport.addEventListener('pointerdown', (e) => {
+        if (!state.hasImage) return;
+        if (state.tool === 'select' && e.target.closest('.plan-label')) return;
+
+        if (state.spaceDown || e.button === 1) {
+          state.isPanning = true;
+          state.panStart = { x: e.clientX - state.panX, y: e.clientY - state.panY };
+          viewport.style.cursor = 'grabbing';
+          viewport.setPointerCapture(e.pointerId);
+          return;
+        }
+        if (e.button !== 0) return;
+
+        if (state.tool === 'select') {
+          if (state.selectedLabelId !== null) {
+            state.selectedLabelId = null;
+            renderLabels();
+            syncInspector();
+          }
+          return;
+        }
+
+        const pt = clientToImage(e.clientX, e.clientY);
+        if (state.tool === 'magicErase') { applyMagicErase(pt.x, pt.y); return; }
+
+        state.isDrawing = true;
+        state.drawStart = pt;
+        state.drawLast = pt;
+        viewport.setPointerCapture(e.pointerId);
+
+        if (state.tool === 'brushErase' || state.tool === 'brushRestore' || state.tool === 'blackPen') {
+          drawBrushSegment(pt.x, pt.y, pt.x, pt.y, state.tool);
+        }
+      });
+
+      viewport.addEventListener('pointermove', (e) => {
+        if (!state.hasImage) return;
+        if (state.isPanning) {
+          state.panX = e.clientX - state.panStart.x;
+          state.panY = e.clientY - state.panStart.y;
+          updateStageTransform();
+          return;
+        }
+
+        const pt = clientToImage(e.clientX, e.clientY);
+        state.cursorPt = pt;
+
+        if (!state.isDrawing) {
+          clearPreview();
+          if (state.tool === 'brushErase' || state.tool === 'brushRestore' || state.tool === 'blackPen') {
+            previewCtx.save();
+            previewCtx.beginPath();
+            previewCtx.arc(pt.x, pt.y, state.brushSize / 2, 0, Math.PI * 2);
+            previewCtx.strokeStyle = state.tool === 'brushRestore' ? '#2563eb' : (state.tool === 'brushErase' ? '#dc2626' : '#111111');
+            previewCtx.lineWidth = Math.max(1, 1.5 / state.zoom);
+            previewCtx.stroke();
+            previewCtx.restore();
+          }
+          return;
+        }
+
+        if (state.tool === 'brushErase' || state.tool === 'brushRestore' || state.tool === 'blackPen') {
+          drawBrushSegment(state.drawLast.x, state.drawLast.y, pt.x, pt.y, state.tool);
+          state.drawLast = pt;
+          clearPreview();
+          previewCtx.save();
+          previewCtx.beginPath();
+          previewCtx.arc(pt.x, pt.y, state.brushSize / 2, 0, Math.PI * 2);
+          previewCtx.strokeStyle = state.tool === 'brushRestore' ? '#2563eb' : (state.tool === 'brushErase' ? '#dc2626' : '#111111');
+          previewCtx.lineWidth = Math.max(1, 1.5 / state.zoom);
+          previewCtx.stroke();
+          previewCtx.restore();
+        } else if (state.tool === 'boxErase' || state.tool === 'boxRestore') {
+          clearPreview();
+          const x = Math.min(state.drawStart.x, pt.x), y = Math.min(state.drawStart.y, pt.y);
+          const w = Math.abs(pt.x - state.drawStart.x), h = Math.abs(pt.y - state.drawStart.y);
+          previewCtx.save();
+          previewCtx.fillStyle = state.tool === 'boxErase' ? 'rgba(220, 38, 38, 0.14)' : 'rgba(37, 99, 235, 0.16)';
+          previewCtx.strokeStyle = state.tool === 'boxErase' ? '#dc2626' : '#2563eb';
+          previewCtx.lineWidth = Math.max(1.2, 2 / state.zoom);
+          previewCtx.setLineDash([6 / state.zoom, 4 / state.zoom]);
+          previewCtx.fillRect(x, y, w, h);
+          previewCtx.strokeRect(x, y, w, h);
+          previewCtx.restore();
+        } else if (state.tool === 'wallLine') {
+          clearPreview();
+          const end = computeSnappedEnd(state.drawStart, pt, e.shiftKey);
+          previewCtx.save();
+          previewCtx.strokeStyle = '#000000';
+          previewCtx.lineWidth = state.lineWidth;
+          previewCtx.lineCap = 'square';
+          previewCtx.beginPath();
+          previewCtx.moveTo(state.drawStart.x, state.drawStart.y);
+          previewCtx.lineTo(end.x, end.y);
+          previewCtx.stroke();
+          previewCtx.restore();
+        }
+      });
+
+      viewport.addEventListener('pointerup', (e) => {
+        if (state.isPanning) { state.isPanning = false; selectTool(state.tool); return; }
+        if (!state.isDrawing) return;
+        state.isDrawing = false;
+
+        const pt = clientToImage(e.clientX, e.clientY);
+        let changed = false;
+
+        if (state.tool === 'boxErase' || state.tool === 'boxRestore') {
+          changed = applyBoxTool(state.drawStart, pt, state.tool);
+        } else if (state.tool === 'wallLine') {
+          const end = computeSnappedEnd(state.drawStart, pt, e.shiftKey);
+          if (Math.hypot(end.x - state.drawStart.x, end.y - state.drawStart.y) >= 2) {
+            workCtx.save();
+            workCtx.strokeStyle = '#000000';
+            workCtx.lineWidth = state.lineWidth;
+            workCtx.lineCap = 'square';
+            workCtx.beginPath();
+            workCtx.moveTo(state.drawStart.x, state.drawStart.y);
+            workCtx.lineTo(end.x, end.y);
+            workCtx.stroke();
+            workCtx.restore();
+            changed = true;
+          }
+        } else if (state.tool === 'brushErase' || state.tool === 'brushRestore' || state.tool === 'blackPen') {
+          changed = true;
+        }
+
+        clearPreview();
+        if (changed) pushHistory();
+      });
+
+      viewport.addEventListener('pointerleave', () => { if (!state.isDrawing) clearPreview(); });
+
+      viewport.addEventListener('wheel', (e) => {
+        if (!state.hasImage) return;
+        e.preventDefault();
+        zoomAt(e.deltaY < 0 ? 1.12 : 1 / 1.12, e.clientX, e.clientY);
+      }, { passive: false });
+
+      function addLabel(text, x, y) {
+        if (!state.hasImage) { showToast('請先上傳平面圖或載入範例圖'); return null; }
+        const cleanText = (text || '').trim();
+        if (!cleanText) return null;
+
+        if (x === undefined || y === undefined) {
+          const rect = viewport.getBoundingClientRect();
+          const center = clientToImage(rect.left + rect.width / 2, rect.top + rect.height / 2);
+          const idx = state.labels.length;
+          const row = idx % 5;
+          const col = Math.floor(idx / 5) % 3;
+          const stepY = Math.round(state.defaultStyle.fontSize * 1.45);
+          const stepX = Math.round(state.defaultStyle.fontSize * 3.6);
+          x = clamp(center.x + (col - 1) * stepX * 0.5, 60, state.imgW - 60);
+          y = clamp(center.y + (row - 2) * stepY, 50, state.imgH - 50);
+        }
+
+        const lbl = {
+          id: state.nextLabelId++,
+          text: cleanText,
+          x: Math.round(x),
+          y: Math.round(y),
+          fontSize: state.defaultStyle.fontSize,
+          fontWeight: state.defaultStyle.fontWeight,
+          letterSpacing: state.defaultStyle.letterSpacing,
+          color: state.defaultStyle.color,
+          rotation: state.defaultStyle.rotation,
+          whiteBg: state.defaultStyle.whiteBg
+        };
+        state.labels.push(lbl);
+        state.selectedLabelId = lbl.id;
+        selectTool('select');
+        renderLabels();
+        syncInspector();
+        pushHistory();
+        return lbl;
+      }
+
+      function getSelectedLabel() {
+        return state.labels.find((l) => l.id === state.selectedLabelId) || null;
+      }
+
+      function deleteLabelById(id) {
+        state.labels = state.labels.filter((l) => l.id !== id);
+        if (state.selectedLabelId === id) state.selectedLabelId = null;
+        renderLabels();
+        syncInspector();
+        pushHistory();
+      }
+
+      function renderLabels() {
+        labelsLayer.innerHTML = '';
+
+        state.labels.forEach((lbl) => {
+          const el = document.createElement('div');
+          el.className = 'plan-label' + (lbl.id === state.selectedLabelId ? ' selected' : '');
+          el.dataset.id = String(lbl.id);
+          el.style.left = lbl.x + 'px';
+          el.style.top = lbl.y + 'px';
+          el.style.fontSize = lbl.fontSize + 'px';
+          el.style.fontWeight = lbl.fontWeight;
+          el.style.letterSpacing = lbl.letterSpacing + 'px';
+          el.style.color = lbl.color;
+          el.style.transform = `translate(-50%, -50%) rotate(${lbl.rotation}deg)`;
+          if (lbl.whiteBg) {
+            el.style.background = '#ffffff';
+            el.style.padding = '3px 8px';
+          }
+
+          const span = document.createElement('span');
+          span.className = 'plan-label-text';
+          span.textContent = lbl.text;
+          el.appendChild(span);
+
+          const delBtn = document.createElement('div');
+          delBtn.className = 'label-handle handle-delete';
+          delBtn.textContent = '×';
+          delBtn.title = '刪除文字';
+          delBtn.addEventListener('pointerdown', (e) => { e.stopPropagation(); deleteLabelById(lbl.id); });
+          el.appendChild(delBtn);
+
+          const resizeHandle = document.createElement('div');
+          resizeHandle.className = 'label-handle handle-resize';
+          resizeHandle.title = '拖曳調整文字大小';
+          resizeHandle.addEventListener('pointerdown', (e) => {
+            e.stopPropagation(); e.preventDefault();
+            const startX = e.clientX, startY = e.clientY, startSize = lbl.fontSize;
+            const onMove = (me) => {
+              const delta = ((me.clientX - startX) + (me.clientY - startY)) / (2 * state.zoom);
+              lbl.fontSize = clamp(Math.round(startSize + delta * 0.65), 12, 120);
+              el.style.fontSize = lbl.fontSize + 'px';
+              $('inspFontSize').value = lbl.fontSize;
+              $('valFontSize').textContent = lbl.fontSize + ' px';
+            };
+            const onUp = () => {
+              window.removeEventListener('pointermove', onMove);
+              window.removeEventListener('pointerup', onUp);
+              state.defaultStyle.fontSize = lbl.fontSize;
+              pushHistory();
+            };
+            window.addEventListener('pointermove', onMove);
+            window.addEventListener('pointerup', onUp);
+          });
+          el.appendChild(resizeHandle);
+
+          el.addEventListener('pointerdown', (e) => {
+            if (state.tool !== 'select') return;
+            if (e.target.classList.contains('plan-label-edit')) return;
+            e.stopPropagation();
+
+            state.selectedLabelId = lbl.id;
+            document.querySelectorAll('.plan-label').forEach((n) => {
+              n.classList.toggle('selected', Number(n.dataset.id) === lbl.id);
+            });
+            syncInspector();
+
+            const startClientX = e.clientX, startClientY = e.clientY;
+            const origX = lbl.x, origY = lbl.y;
+            let moved = false;
+            el.classList.add('dragging');
+
+            const onMove = (me) => {
+              const dx = (me.clientX - startClientX) / state.zoom;
+              const dy = (me.clientY - startClientY) / state.zoom;
+              if (Math.abs(dx) > 1.5 || Math.abs(dy) > 1.5) moved = true;
+              lbl.x = clamp(Math.round(origX + dx), 10, state.imgW - 10);
+              lbl.y = clamp(Math.round(origY + dy), 10, state.imgH - 10);
+              el.style.left = lbl.x + 'px';
+              el.style.top = lbl.y + 'px';
+            };
+            const onUp = () => {
+              el.classList.remove('dragging');
+              window.removeEventListener('pointermove', onMove);
+              window.removeEventListener('pointerup', onUp);
+              if (moved) pushHistory();
+            };
+            window.addEventListener('pointermove', onMove);
+            window.addEventListener('pointerup', onUp);
+          });
+
+          el.addEventListener('dblclick', (e) => {
+            e.stopPropagation();
+            const inp = document.createElement('input');
+            inp.type = 'text';
+            inp.className = 'plan-label-edit';
+            inp.value = lbl.text;
+            inp.style.width = Math.max(70, lbl.text.length * lbl.fontSize + 24) + 'px';
+            span.style.display = 'none';
+            el.insertBefore(inp, span);
+            inp.focus(); inp.select();
+
+            const finish = () => {
+              const v = inp.value.trim();
+              if (v) lbl.text = v;
+              renderLabels(); syncInspector(); pushHistory();
+            };
+            inp.addEventListener('blur', finish);
+            inp.addEventListener('keydown', (ke) => {
+              if (ke.key === 'Enter') inp.blur();
+              if (ke.key === 'Escape') { inp.value = lbl.text; inp.blur(); }
+            });
+          });
+
+          labelsLayer.appendChild(el);
+        });
+
+        renderPlacedList();
+      }
+
+      function renderPlacedList() {
+        const list = $('placedList');
+        $('placedCount').textContent = String(state.labels.length);
+        $('btnClearLabels').style.display = state.labels.length > 0 ? 'block' : 'none';
+        $('btnSyncStyleAll').disabled = state.labels.length === 0;
+
+        if (state.labels.length === 0) {
+          list.innerHTML = '<div style="font-size:11.5px;color:var(--text-muted);padding:4px 0;">尚未加入標籤，可從上方拖曳或點擊字眼。</div>';
+          return;
+        }
+        list.innerHTML = '';
+        state.labels.forEach((lbl) => {
+          const item = document.createElement('div');
+          item.className = 'placed-item' + (lbl.id === state.selectedLabelId ? ' active' : '');
+          item.innerHTML = `<span>${escapeHtml(lbl.text)} <small style="opacity:0.6">(${lbl.fontSize}px)</small></span>`;
+          const del = document.createElement('button');
+          del.className = 'placed-item-del';
+          del.textContent = '×';
+          del.title = '移除';
+          del.addEventListener('click', (e) => { e.stopPropagation(); deleteLabelById(lbl.id); });
+          item.appendChild(del);
+          item.addEventListener('click', () => {
+            state.selectedLabelId = lbl.id;
+            selectTool('select');
+            renderLabels();
+            syncInspector();
+          });
+          list.appendChild(item);
+        });
+      }
+
+      function escapeHtml(s) {
+        return s.replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+      }
+
+      function syncInspector() {
+        const lbl = getSelectedLabel();
+        const styleSrc = lbl || state.defaultStyle;
+
+        $('inspectorStatus').textContent = lbl ? `編輯中：${lbl.text}` : '新標籤預設';
+        $('inspText').value = lbl ? lbl.text : '';
+        $('inspText').disabled = !lbl;
+        $('btnDeleteLabel').disabled = !lbl;
+
+        $('inspFontSize').value = styleSrc.fontSize;
+        $('valFontSize').textContent = styleSrc.fontSize + ' px';
+        $('inspLetterSpacing').value = styleSrc.letterSpacing;
+        $('valLetterSpacing').textContent = styleSrc.letterSpacing + ' px';
+        $('inspWhiteBg').checked = !!styleSrc.whiteBg;
+        $('inspColorPicker').value = styleSrc.color;
+
+        document.querySelectorAll('#weightGrid .mini-pill').forEach((b) => {
+          b.classList.toggle('active', b.dataset.weight === String(styleSrc.fontWeight));
+        });
+        document.querySelectorAll('#rotGrid .mini-pill').forEach((b) => {
+          b.classList.toggle('active', Number(b.dataset.rot) === Number(styleSrc.rotation));
+        });
+        document.querySelectorAll('#colorSwatches .color-swatch').forEach((b) => {
+          b.classList.toggle('active', b.dataset.color.toLowerCase() === styleSrc.color.toLowerCase());
+        });
+      }
+
+      function updateActiveLabelStyle(patch, commitHistory = false) {
+        Object.assign(state.defaultStyle, patch);
+        const lbl = getSelectedLabel();
+        if (lbl) {
+          Object.assign(lbl, patch);
+          renderLabels();
+          if (commitHistory) pushHistory();
+        }
+        syncInspector();
+      }
+
+      function initPresetChips() {
+        const container = $('presetChips');
+        PRESET_LABELS.forEach((word) => {
+          const btn = document.createElement('button');
+          btn.className = 'preset-chip';
+          btn.textContent = word;
+          btn.title = `拖曳「${word}」到圖紙上，或點擊加入`;
+
+          btn.addEventListener('pointerdown', (e) => {
+            if (e.button !== 0) return;
+            e.preventDefault();
+            const startX = e.clientX, startY = e.clientY;
+            let dragging = false;
+
+            const onMove = (me) => {
+              if (!dragging && Math.hypot(me.clientX - startX, me.clientY - startY) > 6) {
+                dragging = true;
+                dragGhost.textContent = word;
+                dragGhost.style.fontSize = Math.max(14, Math.round(state.defaultStyle.fontSize * state.zoom)) + 'px';
+                dragGhost.style.fontWeight = state.defaultStyle.fontWeight;
+                dragGhost.style.display = 'block';
+              }
+              if (dragging) {
+                dragGhost.style.left = me.clientX + 'px';
+                dragGhost.style.top = me.clientY + 'px';
+              }
+            };
+
+            const onUp = (ue) => {
+              window.removeEventListener('pointermove', onMove);
+              window.removeEventListener('pointerup', onUp);
+              dragGhost.style.display = 'none';
+
+              if (!dragging) {
+                addLabel(word);
+              } else {
+                const vRect = viewport.getBoundingClientRect();
+                if (ue.clientX >= vRect.left && ue.clientX <= vRect.right &&
+                    ue.clientY >= vRect.top && ue.clientY <= vRect.bottom) {
+                  const pt = clientToImage(ue.clientX, ue.clientY);
+                  addLabel(word, clamp(pt.x, 20, state.imgW - 20), clamp(pt.y, 20, state.imgH - 20));
+                }
+              }
+            };
+
+            window.addEventListener('pointermove', onMove);
+            window.addEventListener('pointerup', onUp);
+          });
+
+          container.appendChild(btn);
+        });
+      }
+
+      function buildExportCanvas() {
+        const c = document.createElement('canvas');
+        c.width = state.imgW;
+        c.height = state.imgH;
+        const ctx = c.getContext('2d');
+
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, c.width, c.height);
+        ctx.drawImage(workCanvas, 0, 0);
+
+        const fontFamily = '"PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif';
+        state.labels.forEach((lbl) => {
+          ctx.save();
+          ctx.translate(lbl.x, lbl.y);
+          ctx.rotate((lbl.rotation * Math.PI) / 180);
+          ctx.font = `${lbl.fontWeight} ${lbl.fontSize}px ${fontFamily}`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+
+          const chars = Array.from(lbl.text);
+          const spacing = lbl.letterSpacing || 0;
+          const widths = chars.map((ch) => ctx.measureText(ch).width);
+          const totalW = widths.reduce((a, b) => a + b, 0) + Math.max(0, chars.length - 1) * spacing;
+
+          if (lbl.whiteBg) {
+            const padX = 10, padY = 6;
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(-totalW / 2 - padX, -lbl.fontSize * 0.62 - padY, totalW + padX * 2, lbl.fontSize * 1.24 + padY * 2);
+          }
+
+          ctx.fillStyle = lbl.color;
+          if (spacing === 0) {
+            ctx.fillText(lbl.text, 0, 0);
+          } else {
+            let curX = -totalW / 2;
+            chars.forEach((ch, idx) => {
+              const cw = widths[idx];
+              ctx.fillText(ch, curX + cw / 2, 0);
+              curX += cw + spacing;
+            });
+          }
+          ctx.restore();
+        });
+        return c;
+      }
+
+      function downloadExport(format) {
+        if (!state.hasImage) return;
+        const c = buildExportCanvas();
+        const mime = format === 'jpg' ? 'image/jpeg' : 'image/png';
+        const link = document.createElement('a');
+        link.download = `格局清圖成品.${format}`;
+        link.href = c.toDataURL(mime, 0.96);
+        link.click();
+        showToast(`已下載 ${format.toUpperCase()} 成品圖！`);
+      }
+
+      async function copyExportToClipboard() {
+        if (!state.hasImage) return;
+        const c = buildExportCanvas();
+        try {
+          const blob = await new Promise((res) => c.toBlob(res, 'image/png'));
+          await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+          showToast('已複製成品圖片到剪貼簿，可直接貼上！');
+        } catch (err) {
+          showToast('此瀏覽器不支援直接複製圖片，請使用「下載 PNG」');
+        }
+      }
+
+      $('btnUpload').addEventListener('click', () => fileInput.click());
+      $('btnEmptyUpload').addEventListener('click', () => fileInput.click());
+      fileInput.addEventListener('change', (e) => {
+        if (e.target.files && e.target.files[0]) loadImageFile(e.target.files[0]);
+        e.target.value = '';
+      });
+      $('btnDemo').addEventListener('click', generateDemoFloorPlan);
+      $('btnEmptyDemo').addEventListener('click', generateDemoFloorPlan);
+
+      ['dragenter', 'dragover'].forEach((ev) => {
+        viewport.addEventListener(ev, (e) => { e.preventDefault(); viewport.classList.add('drag-over'); });
+      });
+      ['dragleave', 'drop'].forEach((ev) => {
+        viewport.addEventListener(ev, (e) => { e.preventDefault(); viewport.classList.remove('drag-over'); });
+      });
+      viewport.addEventListener('drop', (e) => {
+        const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+        if (file) loadImageFile(file);
+      });
+
+      window.addEventListener('paste', (e) => {
+        if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')) return;
+        const items = e.clipboardData && e.clipboardData.items;
+        if (!items) return;
+        for (const item of items) {
+          if (item.type.startsWith('image/')) { loadImageFile(item.getAsFile()); break; }
+        }
+      });
+
+      $('btnUndo').addEventListener('click', undo);
+      $('btnRedo').addEventListener('click', redo);
+      $('btnRotateL').addEventListener('click', () => rotateFloorPlan(-1));
+      $('btnRotateR').addEventListener('click', () => rotateFloorPlan(1));
+      $('btnZoomIn').addEventListener('click', () => zoomAt(1.2));
+      $('btnZoomOut').addEventListener('click', () => zoomAt(1 / 1.2));
+      $('zoomReadout').addEventListener('click', fitToViewport);
+
+      $('btnUnderlay').addEventListener('click', () => {
+        state.underlayOn = !state.underlayOn;
+        $('btnUnderlay').classList.toggle('active', state.underlayOn);
+        $('underlayBar').classList.toggle('show', state.underlayOn);
+        applyUnderlayVisibility();
+      });
+      $('underlayOpacity').addEventListener('input', (e) => {
+        state.underlayOpacity = Number(e.target.value) / 100;
+        applyUnderlayVisibility();
+      });
+
+      const stopPeek = () => {
+        if (!state.peekingOrig) return;
+        state.peekingOrig = false;
+        rebuildUnderlayAndCleanRef();
+      };
+      $('btnPeekOrig').addEventListener('pointerdown', () => {
+        if (!state.hasImage) return;
+        state.peekingOrig = true;
+        applyUnderlayVisibility();
+      });
+      window.addEventListener('pointerup', stopPeek);
+      $('btnPeekOrig').addEventListener('pointerleave', stopPeek);
+
+      $('btnExportPng').addEventListener('click', () => downloadExport('png'));
+      $('btnExportJpg').addEventListener('click', () => downloadExport('jpg'));
+      $('btnCopyImg').addEventListener('click', copyExportToClipboard);
+
+      $('btnAutoClean').addEventListener('click', runAutoClean);
+      ['modeSmart', 'modeWalls'].forEach((id) => {
+        $(id).addEventListener('click', (e) => {
+          state.cleanMode = e.currentTarget.dataset.mode;
+          $('modeSmart').classList.toggle('active', state.cleanMode === 'smart');
+          $('modeWalls').classList.toggle('active', state.cleanMode === 'walls');
+        });
+      });
+
+      $('optKeepOpenings').addEventListener('change', (e) => { state.keepOpenings = e.target.checked; });
+      $('optWhiteBg').addEventListener('change', (e) => { state.whiteBg = e.target.checked; });
+      $('optWallThick').addEventListener('input', (e) => {
+        state.wallThick = Number(e.target.value);
+        $('valWallThick').textContent = state.wallThick + ' px';
+      });
+      $('optDarkThresh').addEventListener('input', (e) => {
+        state.darkThresh = Number(e.target.value);
+        $('valDarkThresh').textContent = String(state.darkThresh);
+      });
+
+      document.querySelectorAll('#toolGrid .tool-btn').forEach((btn) => {
+        btn.addEventListener('click', () => selectTool(btn.dataset.tool));
+      });
+      $('optBrushSize').addEventListener('input', (e) => {
+        state.brushSize = Number(e.target.value);
+        $('valBrushSize').textContent = state.brushSize + ' px';
+      });
+      $('optLineWidth').addEventListener('input', (e) => {
+        state.lineWidth = Number(e.target.value);
+        $('valLineWidth').textContent = state.lineWidth + ' px';
+      });
+      $('optOrthoSnap').addEventListener('change', (e) => { state.orthoSnap = e.target.checked; });
+      $('optRestoreThresh').addEventListener('input', (e) => {
+        state.restoreThresh = Number(e.target.value);
+        $('valRestoreThresh').textContent = String(state.restoreThresh);
+        if (state.hasImage) rebuildUnderlayAndCleanRef();
+      });
+
+      const addCustomFromInput = () => {
+        const v = $('customLabelInput').value.trim();
+        if (!v) return;
+        if (addLabel(v)) $('customLabelInput').value = '';
+      };
+      $('btnAddCustom').addEventListener('click', addCustomFromInput);
+      $('customLabelInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') addCustomFromInput(); });
+
+      $('inspText').addEventListener('input', (e) => {
+        const lbl = getSelectedLabel();
+        if (!lbl) return;
+        lbl.text = e.target.value;
+        renderLabels();
+      });
+      $('inspText').addEventListener('change', () => pushHistory());
+      $('inspFontSize').addEventListener('input', (e) => updateActiveLabelStyle({ fontSize: Number(e.target.value) }, false));
+      $('inspFontSize').addEventListener('change', () => { if (getSelectedLabel()) pushHistory(); });
+      $('btnFontMinus').addEventListener('click', () => updateActiveLabelStyle({ fontSize: clamp(Number($('inspFontSize').value) - 2, 12, 120) }, true));
+      $('btnFontPlus').addEventListener('click', () => updateActiveLabelStyle({ fontSize: clamp(Number($('inspFontSize').value) + 2, 12, 120) }, true));
+
+      document.querySelectorAll('#weightGrid .mini-pill').forEach((btn) => {
+        btn.addEventListener('click', () => updateActiveLabelStyle({ fontWeight: btn.dataset.weight }, true));
+      });
+      $('inspLetterSpacing').addEventListener('input', (e) => updateActiveLabelStyle({ letterSpacing: Number(e.target.value) }, false));
+      $('inspLetterSpacing').addEventListener('change', () => { if (getSelectedLabel()) pushHistory(); });
+      document.querySelectorAll('#colorSwatches .color-swatch').forEach((btn) => {
+        btn.addEventListener('click', () => updateActiveLabelStyle({ color: btn.dataset.color }, true));
+      });
+      $('inspColorPicker').addEventListener('input', (e) => updateActiveLabelStyle({ color: e.target.value }, false));
+      $('inspColorPicker').addEventListener('change', () => { if (getSelectedLabel()) pushHistory(); });
+      document.querySelectorAll('#rotGrid .mini-pill').forEach((btn) => {
+        btn.addEventListener('click', () => updateActiveLabelStyle({ rotation: Number(btn.dataset.rot) }, true));
+      });
+      $('inspWhiteBg').addEventListener('change', (e) => updateActiveLabelStyle({ whiteBg: e.target.checked }, true));
+
+      $('btnDeleteLabel').addEventListener('click', () => {
+        if (state.selectedLabelId !== null) deleteLabelById(state.selectedLabelId);
+      });
+      $('btnSyncStyleAll').addEventListener('click', () => {
+        if (state.labels.length === 0) return;
+        const s = getSelectedLabel() || state.defaultStyle;
+        state.labels.forEach((l) => {
+          l.fontSize = s.fontSize; l.fontWeight = s.fontWeight;
+          l.letterSpacing = s.letterSpacing; l.color = s.color; l.whiteBg = s.whiteBg;
+        });
+        renderLabels(); pushHistory();
+        showToast('已將字體大小與樣式套用至圖紙上所有標籤');
+      });
+      $('btnClearLabels').addEventListener('click', () => {
+        if (state.labels.length === 0) return;
+        state.labels = []; state.selectedLabelId = null;
+        renderLabels(); syncInspector(); pushHistory();
+        showToast('已清除所有文字標籤');
+      });
+
+      window.addEventListener('keydown', (e) => {
+        const inInput = document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA');
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !inInput) {
+          e.preventDefault();
+          if (e.shiftKey) redo(); else undo();
+          return;
+        }
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y' && !inInput) {
+          e.preventDefault(); redo(); return;
+        }
+        if (inInput) return;
+
+        if (e.code === 'Space' && state.hasImage) {
+          e.preventDefault();
+          if (!state.spaceDown) { state.spaceDown = true; viewport.style.cursor = 'grab'; }
+          return;
+        }
+        if ((e.key === 'Delete' || e.key === 'Backspace') && state.selectedLabelId !== null) {
+          e.preventDefault(); deleteLabelById(state.selectedLabelId); return;
+        }
+
+        const lbl = getSelectedLabel();
+        if (lbl && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+          e.preventDefault();
+          const step = e.shiftKey ? 10 : 2;
+          if (e.key === 'ArrowUp') lbl.y = clamp(lbl.y - step, 10, state.imgH - 10);
+          if (e.key === 'ArrowDown') lbl.y = clamp(lbl.y + step, 10, state.imgH - 10);
+          if (e.key === 'ArrowLeft') lbl.x = clamp(lbl.x - step, 10, state.imgW - 10);
+          if (e.key === 'ArrowRight') lbl.x = clamp(lbl.x + step, 10, state.imgW - 10);
+          renderLabels();
+          return;
+        }
+
+        const keyMap = { v: 'select', e: 'boxErase', b: 'brushErase', w: 'magicErase', r: 'boxRestore', t: 'brushRestore', l: 'wallLine', p: 'blackPen' };
+        const k = e.key.toLowerCase();
+        if (keyMap[k]) selectTool(keyMap[k]);
+      });
+
+      window.addEventListener('keyup', (e) => {
+        if (e.code === 'Space') {
+          state.spaceDown = false;
+          if (!state.isPanning) selectTool(state.tool);
+        }
+      });
+
+      window.addEventListener('resize', () => { if (state.hasImage) updateStageTransform(); });
+
+      initPresetChips();
+      selectTool('select');
+      syncInspector();
+    })();
+  </script>
+</body>
+</html>
